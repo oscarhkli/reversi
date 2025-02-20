@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"reflect"
 	"sort"
 	"testing"
@@ -21,13 +22,13 @@ func TestPossibleMoves(t *testing.T) {
 		},
 	}
 
-	if got, want := g.possibleMoves(1), map[Point][]Point{
+	if got, want := g.PossibleMoves(1), map[Point][]Point{
 		{4, 2}: {{4, 3}},
 		{5, 3}: {{4, 3}},
 		{2, 4}: {{3, 4}},
 		{3, 5}: {{3, 4}},
 	}; !equalMapUnorderedSlice(got, want) {
-		t.Errorf("possibleMoves(%v, %v), want: %v, got %v", "board", 1, want, got)
+		t.Errorf("PossibleMoves(%v, %v), want: %v, got %v", "board", 1, want, got)
 	}
 }
 
@@ -46,13 +47,13 @@ func TestPossibleMovesForDiagonals(t *testing.T) {
 		},
 	}
 
-	if got, want := g.possibleMoves(1), map[Point][]Point{
+	if got, want := g.PossibleMoves(1), map[Point][]Point{
 		{3, 1}: {{4, 2}},
 		{5, 1}: {{4, 2}},
 		{3, 5}: {{3, 4}, {4, 4}},
 		{5, 5}: {{4, 4}},
 	}; !equalMapUnorderedSlice(got, want) {
-		t.Errorf("possibleMoves(%v, %v), want: %v, got %v", "board", 1, want, got)
+		t.Errorf("PossibleMoves(%v, %v), want: %v, got %v", "board", 1, want, got)
 	}
 }
 
@@ -71,7 +72,7 @@ func TestPossibleMovesForAllDirections(t *testing.T) {
 		},
 	}
 
-	if got, want := g.possibleMoves(2), map[Point][]Point{
+	if got, want := g.PossibleMoves(2), map[Point][]Point{
 		{4, 3}: {
 			{2, 1}, {4, 1}, {6, 1},
 			{3, 2}, {4, 2}, {5, 2},
@@ -80,7 +81,7 @@ func TestPossibleMovesForAllDirections(t *testing.T) {
 			{2, 5}, {4, 5}, {6, 5},
 		},
 	}; !equalMapUnorderedSlice(got, want) {
-		t.Errorf("possibleMoves(%v, %v), want: %v, got %v", "board", 1, want, got)
+		t.Errorf("PossibleMoves(%v, %v), want: %v, got %v", "board", 1, want, got)
 	}
 }
 
@@ -110,4 +111,48 @@ func equalMapUnorderedSlice(got, want map[Point][]Point) bool {
 		}
 	}
 	return true
+}
+
+func TestNotionToPoint(t *testing.T) {
+	tests := map[string]struct {
+		notation string
+		point Point
+		err error
+	} {
+		"valid input": {
+			notation: "a5",
+			point: Point{0, 4}, 
+			err: nil,
+		},
+		"another valid input": {
+			notation: "g2",
+			point: Point{6, 1}, 
+			err: nil,
+		},
+		"out of y-range": {
+			notation: "a9",
+			point: Point{},
+			err: errors.New("invalid input"),
+		},
+		"out of x-range": {
+			notation: "x6",
+			point: Point{},
+			err: errors.New("invalid input"),
+		},
+		"irrelavant input": {
+			notation: "asdlfkjasldf",
+			point: Point{},
+			err: errors.New("invalid input"),
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			gotNotation, gotError := notationToPoint(test.notation)
+			wantNotation, wantError := test.point, test.err;	
+			if gotNotation != wantNotation || (gotError != nil && wantError == nil) {
+				t.Errorf("notationToPoint(%v), want: (%v, %v), got (%v, %v)", test.notation, wantNotation, wantError, gotNotation, gotError)
+			}
+		})
+	}
 }
