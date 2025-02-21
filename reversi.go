@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 )
 
 const (
@@ -119,16 +118,16 @@ func (p *Player) ChooseMove(g *GameBoard) (Point, error) {
 }
 
 func (p *Player) randomChooseMove() (Point, error) {
-		for point := range p.possibleMoves {
-			return point, nil
-		}
-		return Point{}, errors.New(fmt.Sprintf("unexpected error: possibleMoves of %v is empty", p.name))
+	for point := range p.possibleMoves {
+		return point, nil
+	}
+	return Point{}, errors.New(fmt.Sprintf("unexpected error: possibleMoves of %v is empty", p.name))
 }
 
 func (p *Player) humanChooseMove() (Point, error) {
 	for i := 0; i < 3; i++ {
 		var input Notation
-		fmt.Printf("%v: Choose a cell for your disk (e.g., c2, h3):\n", p.name)
+		fmt.Printf("%v: Choose a cell for your disk (e.g., c2, h3): ", p.name)
 		fmt.Scanln(&input)
 
 		if len(input) == 0 {
@@ -219,40 +218,39 @@ func NewGameBoard(p1, p2 Player, cfgFuncs ...GameCfgFunc) *GameBoard {
 func (g GameBoard) Print() {
 	currPlayer := g.CurrentPlayer()
 
-	var sb strings.Builder
-	line := "+-+-+-+-+-+-+-+-+-+\n"
+	line := "+-+-+-+-+-+-+-+-+-+"
 
-	sb.WriteString(line)
-	sb.WriteString("| |a|b|c|d|e|f|g|h|\n")
-	sb.WriteString(line)
-	for i, row := range g.board {
-		sb.WriteString(fmt.Sprintf("|%d|", i+1))
-		for j, cell := range row {
-			if cell == 1 {
-				sb.WriteString("●")
-			} else if cell == 2 {
-				sb.WriteString("○")
-			} else {
-				if g.cfg.showHint {
-					point := Point{j, i}
-					_, ok := currPlayer.possibleMoves[point]
-					if ok {
-						sb.WriteString("?")
-					} else {
-						sb.WriteString(" ")
-					}
-				} else {
-					sb.WriteString(" ")
-				}
-			}
-			sb.WriteString("|")
-		}
-		sb.WriteString("\n")
-		sb.WriteString(line)
+	hintMark := " "
+	if g.cfg.showHint {
+		hintMark = "?"
 	}
-	sb.WriteString(fmt.Sprintf("Turn %2d | %s: %2d | %s: %2d\n", g.turn, g.p1.name, g.p1.score, g.p2.name, g.p2.score))
 
-	fmt.Print(sb.String())
+	deduceMark := func(i, j int) string {
+		switch g.board[j][i] {
+		case 1:
+			return "●"
+		case 2:
+			return "○"
+		}
+		point := Point{j, i}
+		_, ok := currPlayer.possibleMoves[point]
+		if !ok {
+			return " "
+		}
+		return hintMark
+	}
+
+	fmt.Println(line)
+	fmt.Println("| |a|b|c|d|e|f|g|h|")
+	fmt.Println(line)
+	for i, row := range g.board {
+		fmt.Printf("|%d|", i+1)
+		for j := range row {
+			fmt.Printf("%s|", deduceMark(j, i))
+		}
+		fmt.Printf("\n%s\n", line)
+	}
+	fmt.Printf("Turn %2d | %s: %2d | %s: %2d\n\n", g.turn, g.p1.name, g.p1.score, g.p2.name, g.p2.score)
 }
 
 func (g GameBoard) PossibleMoves(player int) map[Point][]Point {
@@ -340,6 +338,15 @@ func (g GameBoard) CurrentPlayer() *Player {
 	return g.p2
 }
 
+func (g GameBoard) Result() *Player {
+	if g.p1.score > g.p2.score {
+		return g.p1
+	} else if g.p1.score < g.p2.score {
+		return g.p2
+	}
+	return nil
+}
+
 func createPlayer(id int) *Player {
 	fmt.Printf("Settings for Player %d\n", id)
 	fmt.Printf("Name (empty for default name): ")
@@ -359,39 +366,58 @@ func createPlayer(id int) *Player {
 
 func main() {
 	p1, p2 := createPlayer(1), createPlayer(2)
-	g := NewGameBoard(*p1, *p2, WithP1First(true), WithShowHint(true))
 
-	for !g.EndGame() {
-		g.Print()
-		currPlayer := g.CurrentPlayer()
-		if len(currPlayer.possibleMoves) == 0 {
-			fmt.Printf("%v has no possibleMoves and is skipped.\n", currPlayer.name)
+	killGame := false
+	round := 1
+
+	var g *GameBoard
+
+	for !killGame {
+		g = NewGameBoard(*p1, *p2, WithP1First(round%2 == 1), WithShowHint(true))
+
+		for !g.EndGame() {
+			g.Print()
+			currPlayer := g.CurrentPlayer()
+			if len(currPlayer.possibleMoves) == 0 {
+				fmt.Printf("%v has no possibleMoves and is skipped.\n", currPlayer.name)
+				g.RefreshState()
+				continue
+			}
+
+			point, err := currPlayer.ChooseMove(g)
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
+
+			flips, err := g.Mark(point, *currPlayer)
+			if err != nil {
+				fmt.Println(err.Error())
+				os.Exit(1)
+			}
+
+			notation, err := point.ToNotation()
+			if err != nil {
+				fmt.Println(err.Error())
+				os.Exit(1)
+			}
+
+			fmt.Printf("%v chooses %v and flips %v disks\n", currPlayer.name, notation, flips)
 			g.RefreshState()
-			continue
 		}
 
-		point, err := currPlayer.ChooseMove(g)
-		if err != nil {
-			fmt.Println(err.Error())
-			continue
+		g.Print()
+
+		winner := g.Result()
+		if winner == nil {
+			fmt.Println("Draw Game")
+		} else {
+			fmt.Println("Winner is", winner.name)
 		}
 
-		flips, err := g.Mark(point, *currPlayer)
-		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
-		}
-
-		notation, err := point.ToNotation()
-		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
-		}
-
-		fmt.Printf("%v chooses %v and flips %v disks\n", currPlayer.name, notation, flips)
-		g.RefreshState()
+		fmt.Printf("Play again? ([y]/n): ")
+		var again string
+		fmt.Scanln(&again)
+		killGame = (again == "n")
 	}
-
-	g.Print()
-	fmt.Println("End")
 }
