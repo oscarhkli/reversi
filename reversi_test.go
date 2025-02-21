@@ -113,9 +113,53 @@ func equalMapUnorderedSlice(got, want map[Point][]Point) bool {
 	return true
 }
 
-func TestNotionToPoint(t *testing.T) {
+func TestPointToNotation(t *testing.T) {
 	tests := map[string]struct {
-		notation string
+		notation Notation
+		point    Point
+		err      error
+	}{
+		"valid input": {
+			point:    Point{0, 4},
+			notation: "a5",
+			err:      nil,
+		},
+		"another valid input": {
+			point:    Point{6, 1},
+			notation: "g2",
+			err:      nil,
+		},
+		"out of y-range": {
+			point:    Point{5, 10},
+			notation: "",
+			err:      errors.New("invalid input"),
+		},
+		"out of x-range": {
+			point:    Point{4, 12},
+			notation: "",
+			err:      errors.New("invalid input"),
+		},
+		"irrelavant input": {
+			point:    Point{-1, -1},
+			notation: "",
+			err:      errors.New("invalid input"),
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got, gotError := test.point.ToNotation()
+			want, wantError := test.notation, test.err
+			if got != want || (gotError != nil && wantError == nil) {
+				t.Errorf("%v.ToNotation(), want: (%v, %v), got (%v, %v)", test.point, want, wantError, got, gotError)
+			}
+		})
+	}
+}
+
+func TestNotationToPoint(t *testing.T) {
+	tests := map[string]struct {
+		notation Notation
 		point    Point
 		err      error
 	}{
@@ -148,10 +192,10 @@ func TestNotionToPoint(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			gotNotation, gotError := notationToPoint(test.notation)
-			wantNotation, wantError := test.point, test.err
-			if gotNotation != wantNotation || (gotError != nil && wantError == nil) {
-				t.Errorf("notationToPoint(%v), want: (%v, %v), got (%v, %v)", test.notation, wantNotation, wantError, gotNotation, gotError)
+			got, gotError := test.notation.ToPoint()
+			want, wantError := test.point, test.err
+			if got != want || (gotError != nil && wantError == nil) {
+				t.Errorf("%v.ToPoint(), want: (%v, %v), got (%v, %v)", test.notation, want, wantError, got, gotError)
 			}
 		})
 	}

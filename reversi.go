@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -15,6 +16,24 @@ const (
 type Point struct {
 	X int
 	Y int
+}
+
+func (p Point) ToNotation() (Notation, error) {
+	if p.X < 0 || p.X >= Width || p.Y < 0 || p.Y >= Height {
+		return Notation(""), errors.New("invalid input")
+	}
+	return Notation(fmt.Sprintf("%c%d", 'a'+p.X, 1+p.Y)), nil
+}
+
+type Notation string
+
+func (n Notation) ToPoint() (Point, error) {
+	if len(n) != 2 || n[0] < 'a' || n[0] > 'h' || n[1] < '0' || n[1] > '8' {
+		return Point{}, errors.New("invalid input")
+	}
+	x := int(n[0] - byte('a'))
+	y := int(n[1] - byte('1'))
+	return Point{x, y}, nil
 }
 
 type PlayerType int
@@ -82,6 +101,56 @@ func NewPlayer(id int, cfgFuncs ...PlayerCfgFunc) *Player {
 		possibleMoves: make(map[Point][]Point),
 		playerType:    playerType,
 	}
+}
+
+func (p *Player) ChooseMove(g *GameBoard) (Point, error) {
+	if len(p.possibleMoves) == 0 {
+		return Point{}, errors.New("no possible moves")
+	}
+
+	switch p.playerType {
+	case Human:
+		return p.humanChooseMove()
+	case Computer:
+		return p.randomChooseMove()
+	default:
+		return Point{}, errors.New("unexpected error in ChooseMove")
+	}
+}
+
+func (p *Player) randomChooseMove() (Point, error) {
+		for point := range p.possibleMoves {
+			return point, nil
+		}
+		return Point{}, errors.New(fmt.Sprintf("unexpected error: possibleMoves of %v is empty", p.name))
+}
+
+func (p *Player) humanChooseMove() (Point, error) {
+	for i := 0; i < 3; i++ {
+		var input Notation
+		fmt.Printf("%v: Choose a cell for your disk (e.g., c2, h3):\n", p.name)
+		fmt.Scanln(&input)
+
+		if len(input) == 0 {
+			return p.randomChooseMove()
+		}
+
+		point, err := input.ToPoint()
+		if err != nil {
+			fmt.Println(err.Error())
+			continue
+		}
+
+		_, ok := p.possibleMoves[point]
+		if !ok {
+			fmt.Println("Invalid move, try again.")
+		}
+
+		return point, nil
+	}
+
+	fmt.Println("Too many trails! The game will randomly choose a cell.")
+	return p.randomChooseMove()
 }
 
 type GameCfg struct {
@@ -271,15 +340,6 @@ func (g GameBoard) CurrentPlayer() *Player {
 	return g.p2
 }
 
-func notationToPoint(notation string) (Point, error) {
-	if len(notation) != 2 || notation[0] < 'a' || notation[0] > 'h' || notation[1] < '0' || notation[1] > '8' {
-		return Point{}, errors.New("invalid input")
-	}
-	x := int(notation[0] - byte('a'))
-	y := int(notation[1] - byte('1'))
-	return Point{x, y}, nil
-}
-
 func createPlayer(id int) *Player {
 	fmt.Printf("Settings for Player %d\n", id)
 	fmt.Printf("Name (empty for default name): ")
@@ -305,48 +365,30 @@ func main() {
 		g.Print()
 		currPlayer := g.CurrentPlayer()
 		if len(currPlayer.possibleMoves) == 0 {
-			fmt.Printf("%v has no possibleMoves and is skipped\n", currPlayer.name)
+			fmt.Printf("%v has no possibleMoves and is skipped.\n", currPlayer.name)
 			g.RefreshState()
 			continue
 		}
 
-		if currPlayer.playerType == Human {
-			for {
-				var input string
-				fmt.Printf("%v: Choose a cell for your disk (e.g., c2, h3):\n", currPlayer.name)
-				fmt.Scanln(&input)
-
-				// For testing use
-				if len(input) == 0 {
-					for k := range currPlayer.possibleMoves {
-						flips, _ := g.Mark(k, *currPlayer)
-						fmt.Printf("%v chooses %v and flips %v disks\n", currPlayer.name, k, flips)
-						break
-					}
-				} else {
-					p, err := notationToPoint(input)
-					if err != nil {
-						fmt.Println(err.Error())
-						continue
-					}
-
-					flips, err := g.Mark(p, *currPlayer)
-					if err != nil {
-						fmt.Println(err.Error())
-						continue
-					}
-					fmt.Printf("%v flips %v disks\n", currPlayer.name, flips)
-				}
-				break
-			}
-		} else {
-			// CPU will only select 1 space randomly
-			for k := range currPlayer.possibleMoves {
-				flips, _ := g.Mark(k, *currPlayer)
-				fmt.Printf("%v chooses %v and flips %v disks\n", currPlayer.name, k, flips)
-				break
-			}
+		point, err := currPlayer.ChooseMove(g)
+		if err != nil {
+			fmt.Println(err.Error())
+			continue
 		}
+
+		flips, err := g.Mark(point, *currPlayer)
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+
+		notation, err := point.ToNotation()
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+
+		fmt.Printf("%v chooses %v and flips %v disks\n", currPlayer.name, notation, flips)
 		g.RefreshState()
 	}
 
