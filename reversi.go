@@ -7,43 +7,111 @@ import (
 	"strings"
 )
 
+const (
+	Width  = 8
+	Height = 8
+)
+
 type Point struct {
 	X int
 	Y int
 }
 
-type GameConfig struct {
-	width, height int
-	p1First       bool
-	showHint      bool
-}
+type PlayerType int
+
+const (
+	Unknown PlayerType = iota
+	Human
+	Computer
+)
 
 type Player struct {
 	id            int
 	name          string
 	score         int
 	possibleMoves map[Point][]Point
-	manual        bool
+	playerType    PlayerType
 }
 
-func (p *Player) ToAuto() {
-	p.manual = false
-	p.name = strings.Replace(p.name, "P", "C", 1)
+type PlayerCfg struct {
+	name       string
+	playerType PlayerType
 }
 
-func NewPlayer(id int) *Player {
-	name := "P" + strconv.Itoa(id)
+type PlayerCfgFunc func(playerCfg *PlayerCfg)
+
+func WithName(name string) PlayerCfgFunc {
+	return func(playerCfg *PlayerCfg) {
+		playerCfg.name = name
+	}
+}
+
+func WithPlayerType(playerType PlayerType) PlayerCfgFunc {
+	return func(playerCfg *PlayerCfg) {
+		playerCfg.playerType = playerType
+	}
+}
+
+func NewPlayer(id int, cfgFuncs ...PlayerCfgFunc) *Player {
+	var config PlayerCfg
+	for _, cfgFunc := range cfgFuncs {
+		cfgFunc(&config)
+	}
+
+	playerType := Human
+	if config.playerType != Unknown {
+		playerType = config.playerType
+	}
+
+	var name string
+	if len(config.name) > 0 {
+		name = config.name
+	} else {
+		if playerType == Human {
+			name = "P"
+		} else {
+			name = "C"
+		}
+		name += strconv.Itoa(id)
+	}
+
 	return &Player{
 		id:            id,
 		name:          name,
 		score:         0,
 		possibleMoves: make(map[Point][]Point),
-		manual:        true,
+		playerType:    playerType,
+	}
+}
+
+type GameCfg struct {
+	p1First  bool
+	showHint bool
+}
+
+type GameCfgFunc func(*GameCfg)
+
+func defaultGameConfig() GameCfg {
+	return GameCfg{
+		p1First:  true,
+		showHint: true,
+	}
+}
+
+func WithP1First(p1First bool) GameCfgFunc {
+	return func(cfg *GameCfg) {
+		cfg.p1First = p1First
+	}
+}
+
+func WithShowHint(showHint bool) GameCfgFunc {
+	return func(cfg *GameCfg) {
+		cfg.showHint = showHint
 	}
 }
 
 type GameBoard struct {
-	cfg    GameConfig
+	cfg    GameCfg
 	board  [][]int
 	turn   int
 	p1Turn bool
@@ -51,16 +119,11 @@ type GameBoard struct {
 	p2     *Player
 }
 
-func NewConfig() GameConfig {
-	return GameConfig{
-		width:    8,
-		height:   8,
-		p1First:  true,
-		showHint: true,
+func NewGameBoard(p1, p2 Player, cfgFuncs ...GameCfgFunc) *GameBoard {
+	cfg := defaultGameConfig()
+	for _, cfgFunc := range cfgFuncs {
+		cfgFunc(&cfg)
 	}
-}
-
-func NewGameBoard(cfg GameConfig) *GameBoard {
 	board := [][]int{
 		{0, 0, 0, 0, 0, 0, 0, 0},
 		{0, 0, 0, 0, 0, 0, 0, 0},
@@ -73,12 +136,11 @@ func NewGameBoard(cfg GameConfig) *GameBoard {
 	}
 
 	g := GameBoard{
-		cfg:    cfg,
-		board:  board,
-		turn:   1,
-		p1Turn: cfg.p1First,
-		p1:     NewPlayer(1),
-		p2:     NewPlayer(2),
+		cfg:   cfg,
+		board: board,
+		turn:  1,
+		p1:    &p1,
+		p2:    &p2,
 	}
 	g.p1.possibleMoves = g.PossibleMoves(1)
 	g.p2.possibleMoves = g.PossibleMoves(2)
@@ -119,14 +181,12 @@ func (g GameBoard) Print() {
 		sb.WriteString("\n")
 		sb.WriteString(line)
 	}
-	sb.WriteString(fmt.Sprintf("Turn %2d | P1: %2d | P2: %2d\n", g.turn, g.p1.score, g.p2.score))
+	sb.WriteString(fmt.Sprintf("Turn %2d | %s: %2d | %s: %2d\n", g.turn, g.p1.name, g.p1.score, g.p2.name, g.p2.score))
 
 	fmt.Print(sb.String())
 }
 
 func (g GameBoard) PossibleMoves(player int) map[Point][]Point {
-	width, height := g.cfg.width, g.cfg.height
-
 	pMoves := make(map[Point][]Point)
 
 	// If player is 1, oppo is 2; if player is 2; oppo is 1
@@ -148,12 +208,12 @@ func (g GameBoard) PossibleMoves(player int) map[Point][]Point {
 				dy, dx := dir[0], dir[1]
 				ty, tx := y+dy, x+dx
 
-				if tx == -1 || tx == width || ty == -1 || ty == height || g.board[ty][tx] != 0 {
+				if tx == -1 || tx == Width || ty == -1 || ty == Height || g.board[ty][tx] != 0 {
 					continue
 				}
 
 				flips := []Point{}
-				for nx, ny := x, y; nx >= 0 && nx < width && ny >= 0 && ny < height; nx, ny = nx-dx, ny-dy {
+				for nx, ny := x, y; nx >= 0 && nx < Width && ny >= 0 && ny < Height; nx, ny = nx-dx, ny-dy {
 					if g.board[ny][nx] == 0 {
 						break
 					}
@@ -220,8 +280,26 @@ func notationToPoint(notation string) (Point, error) {
 	return Point{x, y}, nil
 }
 
+func createPlayer(id int) *Player {
+	fmt.Printf("Settings for Player %d\n", id)
+	fmt.Printf("Name (empty for default name): ")
+	var name string
+	fmt.Scanln(&name)
+
+	fmt.Printf("Is Player %d a human (y/n/others = human): ", id)
+	var isHuman string
+	fmt.Scanln(&isHuman)
+
+	playerType := Human
+	if isHuman == "n" {
+		playerType = Computer
+	}
+	return NewPlayer(id, WithName(name), WithPlayerType(playerType))
+}
+
 func main() {
-	g := NewGameBoard(NewConfig())
+	p1, p2 := createPlayer(1), createPlayer(2)
+	g := NewGameBoard(*p1, *p2, WithP1First(true), WithShowHint(true))
 
 	for !g.EndGame() {
 		g.Print()
@@ -232,49 +310,46 @@ func main() {
 			continue
 		}
 
-		if currPlayer.manual {
+		if currPlayer.playerType == Human {
 			for {
 				var input string
 				fmt.Printf("%v: Choose a cell for your disk (e.g., c2, h3):\n", currPlayer.name)
 				fmt.Scanln(&input)
 
 				// For testing use
-				if input == "auto" {
-					oldName := currPlayer.name
-					currPlayer.ToAuto()
-					fmt.Printf("%v is now controlled by CPU and renamed to %v\n", oldName, currPlayer.name)
-					break
-				}
-				p, err := notationToPoint(input)
-				if err != nil {
-					fmt.Println(err.Error())
-					continue
-				}
+				if len(input) == 0 {
+					for k := range currPlayer.possibleMoves {
+						flips, _ := g.Mark(k, *currPlayer)
+						fmt.Printf("%v chooses %v and flips %v disks\n", currPlayer.name, k, flips)
+						break
+					}
+				} else {
+					p, err := notationToPoint(input)
+					if err != nil {
+						fmt.Println(err.Error())
+						continue
+					}
 
-				flips, err := g.Mark(p, *currPlayer)
-				if err != nil {
-					fmt.Println(err.Error())
-					continue
+					flips, err := g.Mark(p, *currPlayer)
+					if err != nil {
+						fmt.Println(err.Error())
+						continue
+					}
+					fmt.Printf("%v flips %v disks\n", currPlayer.name, flips)
 				}
-
-				g.RefreshState()
-				fmt.Printf("%v flips %v disks\n", currPlayer.name, flips)
 				break
 			}
-		}
-
-		if !currPlayer.manual { // Change currPlayer to CPU
+		} else {
 			// CPU will only select 1 space randomly
 			for k := range currPlayer.possibleMoves {
 				flips, _ := g.Mark(k, *currPlayer)
 				fmt.Printf("%v chooses %v and flips %v disks\n", currPlayer.name, k, flips)
-				g.RefreshState()
 				break
 			}
 		}
+		g.RefreshState()
 	}
 
 	g.Print()
 	fmt.Println("End")
-
 }

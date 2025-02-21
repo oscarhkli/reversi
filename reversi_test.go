@@ -9,7 +9,7 @@ import (
 
 func TestPossibleMoves(t *testing.T) {
 	g := GameBoard{
-		cfg: NewConfig(),
+		cfg: defaultGameConfig(),
 		board: [][]int{
 			{0, 0, 0, 0, 0, 0, 0, 0},
 			{0, 0, 0, 0, 0, 0, 0, 0},
@@ -34,7 +34,7 @@ func TestPossibleMoves(t *testing.T) {
 
 func TestPossibleMovesForDiagonals(t *testing.T) {
 	g := GameBoard{
-		cfg: NewConfig(),
+		cfg: defaultGameConfig(),
 		board: [][]int{
 			{0, 0, 0, 0, 0, 0, 0, 0},
 			{0, 0, 0, 0, 0, 0, 0, 0},
@@ -59,7 +59,7 @@ func TestPossibleMovesForDiagonals(t *testing.T) {
 
 func TestPossibleMovesForAllDirections(t *testing.T) {
 	g := GameBoard{
-		cfg: NewConfig(),
+		cfg: defaultGameConfig(),
 		board: [][]int{
 			{0, 2, 2, 2, 2, 2, 2, 2},
 			{0, 2, 1, 1, 1, 1, 1, 2},
@@ -116,40 +116,40 @@ func equalMapUnorderedSlice(got, want map[Point][]Point) bool {
 func TestNotionToPoint(t *testing.T) {
 	tests := map[string]struct {
 		notation string
-		point Point
-		err error
-	} {
+		point    Point
+		err      error
+	}{
 		"valid input": {
 			notation: "a5",
-			point: Point{0, 4}, 
-			err: nil,
+			point:    Point{0, 4},
+			err:      nil,
 		},
 		"another valid input": {
 			notation: "g2",
-			point: Point{6, 1}, 
-			err: nil,
+			point:    Point{6, 1},
+			err:      nil,
 		},
 		"out of y-range": {
 			notation: "a9",
-			point: Point{},
-			err: errors.New("invalid input"),
+			point:    Point{},
+			err:      errors.New("invalid input"),
 		},
 		"out of x-range": {
 			notation: "x6",
-			point: Point{},
-			err: errors.New("invalid input"),
+			point:    Point{},
+			err:      errors.New("invalid input"),
 		},
 		"irrelavant input": {
 			notation: "asdlfkjasldf",
-			point: Point{},
-			err: errors.New("invalid input"),
+			point:    Point{},
+			err:      errors.New("invalid input"),
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			gotNotation, gotError := notationToPoint(test.notation)
-			wantNotation, wantError := test.point, test.err;	
+			wantNotation, wantError := test.point, test.err
 			if gotNotation != wantNotation || (gotError != nil && wantError == nil) {
 				t.Errorf("notationToPoint(%v), want: (%v, %v), got (%v, %v)", test.notation, wantNotation, wantError, gotNotation, gotError)
 			}
