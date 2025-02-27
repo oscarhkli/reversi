@@ -364,7 +364,7 @@ func createPlayer(id int) *Player {
 	return NewPlayer(id, WithName(name), WithPlayerType(playerType))
 }
 
-func main() {
+func amain() {
 	p1, p2 := createPlayer(1), createPlayer(2)
 
 	killGame := false
