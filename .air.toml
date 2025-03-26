@@ -5,10 +5,10 @@ tmp_dir = "tmp"
 [build]
   args_bin = []
   bin = "./tmp/main"
-  cmd = "go build -o ./tmp/main ."
-  delay = 1000
-  exclude_dir = ["assets", "tmp", "vendor", "testdata"]
-  exclude_file = []
+  cmd = "go build -o ./tmp/main ./cmd"
+  delay = 100
+  exclude_dir = ["web/node_modules", "assets", "tmp", "vendor", "testdata"]
+  exclude_file = [".gitignore"]
   exclude_regex = ["_test.go"]
   exclude_unchanged = false
   follow_symlink = false
