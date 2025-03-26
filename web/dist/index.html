@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reversi</title>
+    <link href="./static/styles.css?v={{ .Version }}" rel="stylesheet" />
+</head>
+<body>
+    <h1>Reversi</h1>
+    <input type="text" id="name" placeholder="Enter your name" />
+    <button id="register">Register</button>
+    <div id="hub">
+        <div id="rooms"></div>
+        <input type="text" id="newRoomName" placeholder="Enter new room name" />
+        <button id="createRoom">Create Room</button>
+    </div>
+    <div id="messageLogs">
+    </div>
+    <div id="board"></div>
+    <script src="./static/app.js?v={{ .Version }}"></script>
+</body>
+</html>

@@ -28,3 +28,23 @@ bin/
 Makefile
 out/
 .DS_Store
+
+# Air (Go live-reloading tool) artifacts
+.air
+tmp/
+
+# Node.js dependencies
+/web/node_modules/
+*.log
+.yarn-error.log
+.pnpm-debug.log
+.npmrc
+
+# Package managers
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Keep `index.html` and `styles.css` inside web/dist
+!/web/dist/index.html
+!/web/dist/styles.css

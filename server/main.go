@@ -3,36 +3,40 @@ package main
 import (
 	"log"
 	"net/http"
-	"os"
+	"text/template"
+	"time"
 )
 
-func serveHome(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL)
-	if r.URL.Path != "/" {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	http.ServeFile(w, r, "home.html")
-}
+const addr = "localhost:8080"
 
 func main() {
-	if len(os.Args) < 2 {
-		log.Fatal("please provide an address to listen on as the first argument")
-	}
-
-	addr := os.Args[1]
 	log.Printf("listening on ws://%v", addr)
 
 	hub := newHub()
 	go hub.run()
-	http.HandleFunc("/", serveHome)
+
+	fs := http.FileServer(http.Dir("../web/dist"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		tmpl, err := template.ParseFiles("../web/dist/index.html")
+		if err != nil {
+			http.Error(w, "index.html not found", http.StatusInternalServerError)
+			return
+		}
+		data := struct {
+			Version string
+		}{
+			Version: time.Now().Format("20060102150405"),
+		}
+		w.Header().Set("Content-Type", "text/html")
+		tmpl.Execute(w, data)
+	})
+
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(hub, w, r)
 	})
+
 	err := http.ListenAndServe(addr, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
