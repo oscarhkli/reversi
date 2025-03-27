@@ -5,20 +5,13 @@ const roomsElement = document.getElementById("rooms") as HTMLDivElement;
 const createRoomButton = document.getElementById("createRoom") as HTMLButtonElement;
 // const joinButton = document.getElementById("join") as HTMLButtonElement;
 const boardElement = document.getElementById("board") as HTMLDivElement;
-
+const startButton = document.getElementById("start") as HTMLButtonElement;
+const gameboardElement = document.getElementById("gameboard") as HTMLDivElement
 const serverUrl = "ws://localhost:8080/ws";
-
-interface GameState {
-  board: number[][];
-  turn: number;
-  currentPlayer: string;
-}
 
 interface Player {
   id: string;
   name: string;
-  score: number;
-  possibleMoves: Point[];
 }
 
 interface Point {
@@ -33,7 +26,6 @@ interface Room {
 }
 
 let socket: WebSocket;
-let currentGameState: GameState;
 let roomUUID: string;
 
 const rooms = new Map<string, Room>();
@@ -41,33 +33,13 @@ const rooms = new Map<string, Room>();
 const player: Player = {
   id: "",
   name: "",
-  score: 0,
-  possibleMoves: [],
 };
-
-function createBoard() {
-  boardElement.innerHTML = "";
-  for (let row = 0; row < 8; row++) {
-    const rowDiv = document.createElement("div")
-    for (let col = 0; col < 8; col++) {
-      const cell = document.createElement("button");
-      cell.style.width = "100px";
-      cell.style.height = "100px";
-      cell.dataset.row = row.toString();
-      cell.dataset.col = col.toString();
-      cell.textContent = "";
-      cell.onclick = () => handleCellClick(row, col);
-      rowDiv.appendChild(cell);
-    }
-    boardElement.appendChild(rowDiv);
-  }
-  console.log("created");
-}
 
 enum MessageType {
 	SendMessage = "SEND_MESSAGE",
 	JoinRoom = "JOIN_ROOM",
 	LeaveRoom = "LEAVE_ROOM",
+  StartGame = "START_GAME",
   MakeMove = "MAKE_MOVE"
 }
 
@@ -76,12 +48,16 @@ enum ServerMessageType {
   RoomUpdated = "ROOM_UPDATED",
   RegisterResponse = "REGISTER_RESPONSE",
   JoinRoomResponse = "JOIN_ROOM_RESPONSE",
+  GameError = "GAME_ERROR",
+  GameState = "GAME_STATE",
 }
 
 type ServerMessage = Message
   | RoomUpdatedMessage
   | RegisterResponseMessage
-  | JoinRoomResponseMessage;
+  | JoinRoomResponseMessage
+  | GameErrorMessage
+  | GameStateMessage;
 
 interface Message {
   action: ServerMessageType.SendMessage;
@@ -120,6 +96,38 @@ interface JoinRoomRequestMessage {
   sender: string;
 }
 
+interface StartGameMessage {
+  action: MessageType.StartGame;
+  message: {
+    roomUUID: string;
+  };
+  sender: string;
+}
+
+interface GameErrorMessage {
+  action: ServerMessageType.GameError;
+  message: string;
+}
+
+interface GameStatePlayer {
+  id: string;
+  token: number;
+  score: number;
+  possibleMoves: Point[]
+}
+
+interface GameStateMessage {
+  action: ServerMessageType.GameState;
+  message: {
+    p1: GameStatePlayer;
+    p2: GameStatePlayer;
+    round: number;
+    turn: number;
+    currentPlayer: string; // player id
+    board: [][];
+  };
+}
+
 interface JoinRoomResponseMessage {
   action: ServerMessageType.JoinRoomResponse;
   message: {
@@ -133,26 +141,10 @@ interface JoinRoomResponseMessage {
 interface MakeMoveMessage {
   action: MessageType.MakeMove;
   message: {
-    row: number;
-    col: number;
+    roomUUID: string;
+    point: Point;
   };
-  target: string;
   sender: string;
-}
-
-function handleCellClick(row: number, col: number) {
-  if (currentGameState.board[row][col] == 0 && socket) {
-    const msg: MakeMoveMessage = {
-      action: MessageType.MakeMove,
-      message: {
-        row: row,
-        col: col,
-      },
-      target: "server",
-      sender: player.id,
-    }
-    socket.send(JSON.stringify(msg));
-  }
 }
 
 function register() {
@@ -185,6 +177,8 @@ const serverMessageHandler: Record<ServerMessageType, (msg: ServerMessage) => vo
   [ServerMessageType.RoomUpdated]: (msg) => handleRoomUpdatedMessage(msg as RoomUpdatedMessage),
   [ServerMessageType.RegisterResponse]: (msg) => handleRegisterResponse(msg as RegisterResponseMessage),
   [ServerMessageType.JoinRoomResponse]: (msg) => handleJoinRoomResponse(msg as JoinRoomResponseMessage),
+  [ServerMessageType.GameError]: (msg) => handleGameError(msg as GameErrorMessage),
+  [ServerMessageType.GameState]: (msg) => handleGameState(msg as GameStateMessage),
 }
 
 function handleServerGeneralMessage(resp: Message) {
@@ -279,6 +273,18 @@ function handleJoinRoomResponse(resp: JoinRoomResponseMessage) {
   console.log(`roomUUID: ${roomUUID}`)
 }
 
+function handleGameError(resp: GameErrorMessage) {
+  console.error(resp.message);
+}
+
+function handleGameState(resp: GameStateMessage) {
+  // TODO: use another event handler for start game response
+  startButton.disabled = true;
+  renderEmptyBoard();
+  gameboardElement.hidden = false;
+  renderGameBoard(resp)
+}
+
 function createRoom() {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
     console.error("WebSocket is not connected.");
@@ -303,9 +309,122 @@ function createRoom() {
   socket.send(JSON.stringify(message));
 }
 
+function handleStartGameRequest() {
+  const message: StartGameMessage = {
+    action: MessageType.StartGame,
+    message: {
+      roomUUID: roomUUID
+    },
+    sender: player.id
+  };
+  socket.send(JSON.stringify(message));
+}
+
+function renderGameBoard(resp: GameStateMessage) {
+  const p1Name = document.getElementById("p1Name") as HTMLLabelElement;
+  p1Name.textContent = resp.message.p1.id; // TODO: need name from backend
+  const p1Score = document.getElementById("p1Score") as HTMLLabelElement;
+  p1Score.textContent = resp.message.p1.score.toString();
+  const p2Name = document.getElementById("p2Name") as HTMLLabelElement;;
+  p2Name.textContent = resp.message.p2.id; // TODO: need name from backend
+  const p2Score = document.getElementById("p2Score") as HTMLLabelElement;
+  p2Score.textContent = resp.message.p2.score.toString();
+
+  const p1 = document.getElementById("p1") as HTMLDivElement;
+  const p2 = document.getElementById("p2") as HTMLDivElement;
+  if (resp.message.currentPlayer == resp.message.p1.id) {
+    p1.style.backgroundColor = "lightyellow";
+    p2.style.backgroundColor = "white";
+  } else {
+    p1.style.backgroundColor = "white";
+    p2.style.backgroundColor = "lightyellow";
+  }
+
+  const round = document.getElementById("round") as HTMLLabelElement;
+  round.textContent = resp.message.round.toString();
+  const turn = document.getElementById("turn") as HTMLLabelElement;
+  turn.textContent = resp.message.turn.toString();
+  renderBoard(resp)
+}
+
+function renderEmptyBoard() {
+  boardElement.innerHTML = "";
+  boardElement.hidden = false;
+  for (let row = 0; row < 8; row++) {
+    const rowDiv = document.createElement("div")
+    for (let col = 0; col < 8; col++) {
+      const cell = document.createElement("button");
+      cell.classList.add("board-cell")
+      cell.style.width = "50px";
+      cell.style.height = "50px";
+      cell.dataset.row = row.toString();
+      cell.dataset.col = col.toString();
+      cell.textContent = "";
+      rowDiv.appendChild(cell);
+    }
+    boardElement.appendChild(rowDiv);
+  }
+  console.log("created");
+}
+
+function isCurrentPlayer(resp: GameStateMessage) {
+  return resp.message.currentPlayer === player.id;
+}
+
+function getBoardCell(i: number, j: number): HTMLButtonElement {
+  return document.querySelector(`.board-cell[data-row="${i}"][data-col="${j}"]`) as HTMLButtonElement;
+}
+
+function renderBoard(resp: GameStateMessage) {
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 8; j++) {
+      const token = resp.message.board[i][j] 
+      if (token == 0) {
+        continue;
+      }
+      const cell = getBoardCell(i, j);
+      if (token == 1) {
+        cell.style.backgroundColor = "Black";
+      } else if (token == 2) {
+        cell.style.backgroundColor = "White";
+      } else {
+        cell.style.backgroundColor = "Gainsboro";
+      }
+    }
+  }
+  if (!isCurrentPlayer(resp)) {
+    return;
+  }
+
+  const possibleMoves: Point[] = (resp.message.p1.id === player.id)
+    ? resp.message.p1.possibleMoves
+    : resp.message.p2.possibleMoves;
+  possibleMoves
+    .map((move) => getBoardCell(move.x, move.y))
+    .forEach((cell) => {
+      cell.style.backgroundColor = "LightCyan";
+      cell.onclick = () => handleCellClick(Number(cell.dataset.row), Number(cell.dataset.col));
+    });
+}
+
+function handleCellClick(row: number, col: number) {
+  if (!socket) {
+    return;
+  }
+  const msg: MakeMoveMessage = {
+    action: MessageType.MakeMove,
+    message: {
+      roomUUID: roomUUID,
+      point: {
+        x: col,
+        y: row,
+      },
+    },
+    sender: player.id,
+  }
+  socket.send(JSON.stringify(msg));
+}
+
 registerButton.onclick = register;
 createRoomButton.onclick = createRoom;
-
-createBoard();
-
-
+startButton.onclick = handleStartGameRequest;

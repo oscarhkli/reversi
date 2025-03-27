@@ -15,11 +15,11 @@ func main() {
 	hub := newHub()
 	go hub.run()
 
-	fs := http.FileServer(http.Dir("../web/dist"))
+	fs := http.FileServer(http.Dir("./web/dist"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		tmpl, err := template.ParseFiles("../web/dist/index.html")
+		tmpl, err := template.ParseFiles("./web/dist/index.html")
 		if err != nil {
 			http.Error(w, "index.html not found", http.StatusInternalServerError)
 			return

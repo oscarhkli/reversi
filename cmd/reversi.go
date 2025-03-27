@@ -13,8 +13,8 @@ const (
 )
 
 type Point struct {
-	X int
-	Y int
+	X int `json:"x"`
+	Y int `json:"y"`
 }
 
 func (p Point) ToNotation() (Notation, error) {

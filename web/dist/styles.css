@@ -1,8 +1,10 @@
-/* #board {
+#board {
   display: grid;
-  grid-template-columns: repeat(8, 100px);
   margin: 10px;
 }
-button {
+/* button {
   font-size: 24px;
 } */
+button.board-cell {
+  background-color: darkgreen
+};

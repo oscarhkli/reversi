@@ -180,6 +180,10 @@ func (c *Client) handleNewMessage(jsonMsg []byte) {
 	case LeaveRoom:
 		log.Println(mDTO)
 		c.handleLeaveRoomMessage(mDTO.Message)
+	case StartGame:
+		c.handleStartGameMessage(mDTO.Message)
+	case MakeMove:
+		c.handleMove(mDTO.Message)
 	}
 }
 
@@ -204,6 +208,7 @@ func (c *Client) handleJoinRoomMessage(payload json.RawMessage) {
 
 // handleLeaveRoomMessage leave the room according to the room UUID
 func (c *Client) handleLeaveRoomMessage(payload json.RawMessage) {
+	log.Println("handleLeaveRoom")
 	var lp LeaveRoomPayload
 	err := json.Unmarshal(payload, &lp)
 	if err != nil {
@@ -220,6 +225,40 @@ func (c *Client) handleLeaveRoomMessage(payload json.RawMessage) {
 	}
 
 	r.unregister <- c
+}
+
+func (c *Client) handleStartGameMessage(payload json.RawMessage) {
+	var sp StartGamePayload
+	err := json.Unmarshal(payload, &sp)
+	if err != nil {
+		log.Fatalf("error in unmarshalling JSON message %s", err)
+	}
+
+	r := c.hub.findRoomByUUID(sp.RoomUUID)
+
+	_, ok := c.rooms[r]
+	if !ok {
+		m := Message{
+			Action:  GameError,
+			Message: "You are not in this room.",
+		}
+		c.send <- m.encode()
+		return
+	}
+	if len(r.clients) < 2 {
+		m := Message{
+			Action:  GameError,
+			Message: "2 people are required to start the game.",
+		}
+		c.send <- m.encode()
+		return
+	}
+
+	r.startGame()
+}
+
+func (c *Client) handleMove(payload json.RawMessage) {
+	log.Println("handleMove")
 }
 
 // serveWs handles websocket requests from the peer.

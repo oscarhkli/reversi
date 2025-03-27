@@ -12,6 +12,10 @@ const (
 	RoomUpdated      MessageType = "ROOM_UPDATED"
 	JoinRoom         MessageType = "JOIN_ROOM"
 	LeaveRoom        MessageType = "LEAVE_ROOM"
+	StartGame        MessageType = "START_GAME"
+	GameError        MessageType = "GAME_ERROR"
+	GameState        MessageType = "GAME_STATE"
+	MakeMove         MessageType = "MAKE_MOVE"
 	RegisterResponse MessageType = "REGISTER_RESPONSE"
 	JoinRoomResponse MessageType = "JOIN_ROOM_RESPONSE"
 )
@@ -59,9 +63,34 @@ type LeaveRoomPayload struct {
 	RoomUUID string `json:"roomUUID"`
 }
 
+type StartGamePayload struct {
+	RoomUUID string `json:"roomUUID"`
+}
+
 type RoomUpdatedPayload struct {
 	RoomUUID string `json:"roomUUID"`
 	Action   string `json:"action"`
 	Name     string `json:"name"`
 	Count    int    `json:"count"`
+}
+
+type PlayerPayload struct {
+	ID            string  `json:"id"`
+	Token         int     `json:"token"`
+	Score         int     `json:"score"`
+	PossibleMoves []Point `json:"possibleMoves"`
+}
+
+type GameStatePayload struct {
+	P1            PlayerPayload `json:"p1"`
+	P2            PlayerPayload `json:"p2"`
+	Round         int           `json:"round"`
+	Turn          int           `json:"turn"`
+	CurrentPlayer string        `json:"currentPlayer"`
+	Board         [][]int       `json:"board"`
+}
+
+type MakeMovePayload struct {
+	RoomUUID string `json:"roomUUID"`
+	Point    Point  `json:"point"`
 }
