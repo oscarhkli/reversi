@@ -42,16 +42,10 @@ type RegisterResponsePayload struct {
 }
 
 type ClientMessage struct {
-	Action MessageType `json:"action"`
-	Target string      `json:"target"`
-	Sender *Client     `json:"sender"`
-}
-
-type ClientMessageDTO struct {
-	Action  MessageType     `json:"action"`
-	Message json.RawMessage `json:"message"`
-	Target  string          `json:"target"`
-	Sender  string          `json:"sender"`
+	Action  MessageType `json:"action"`
+	Message any         `json:"message"`
+	Target  string      `json:"target"`
+	Sender  *Client
 }
 
 type JoinRoomPayload struct {

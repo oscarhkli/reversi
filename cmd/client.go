@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -147,25 +148,32 @@ func (c *Client) disconnect() {
 	c.conn.Close()
 }
 
+// unmarshalClientMessagePayload. Unmarshal msg.Message into the correct struct type
+func unmarshalClientMessagePayload[T any](message any) (T, error) {
+	var payload T
+	if payloadMap, ok := message.(map[string]any); ok {
+		// Convert map to JSON and unmarshal into T
+		jsonData, _ := json.Marshal(payloadMap)
+		err := json.Unmarshal(jsonData, &payload)
+		return payload, err
+	}
+	return payload, json.Unmarshal(nil, &payload)
+}
+
 // handleNewMessage handles all client's action
 func (c *Client) handleNewMessage(jsonMsg []byte) {
-	var mDTO ClientMessageDTO
+	var msg ClientMessage
 	log.Println(string(jsonMsg))
-	err := json.Unmarshal(jsonMsg, &mDTO)
+	err := json.Unmarshal(jsonMsg, &msg)
 	if err != nil {
 		log.Fatalf("error in unmarshalling JSON message %s", err)
 	}
 
-	client := c.hub.findClientByID(mDTO.Sender)
-	msg := ClientMessage{
-		Action: mDTO.Action,
-		Target: mDTO.Target,
-		Sender: client,
-	}
+	msg.Sender = c
 
 	switch msg.Action {
 	case SendMessage:
-		room := c.hub.findRoomByUUID(mDTO.Target)
+		room := c.hub.findRoomByUUID(msg.Target)
 		if room != nil {
 			serverMsg := Message{
 				Action:  msg.Action,
@@ -176,27 +184,34 @@ func (c *Client) handleNewMessage(jsonMsg []byte) {
 			room.broadcast <- &serverMsg
 		}
 	case JoinRoom:
-		c.handleJoinRoomMessage(mDTO.Message)
+		if payload, err := unmarshalClientMessagePayload[JoinRoomPayload](msg.Message); err == nil {
+			c.handleJoinRoomMessage(payload)
+		} else {
+			log.Println("Invalid message format for JoinRoom")
+		}
 	case LeaveRoom:
-		log.Println(mDTO)
-		c.handleLeaveRoomMessage(mDTO.Message)
+		if payload, err := unmarshalClientMessagePayload[LeaveRoomPayload](msg.Message); err == nil {
+			c.handleLeaveRoomMessage(payload)
+		} else {
+			log.Println("Invalid message format for LeaveRoom")
+		}
 	case StartGame:
-		c.handleStartGameMessage(mDTO.Message)
+		if payload, err := unmarshalClientMessagePayload[StartGamePayload](msg.Message); err == nil {
+			c.handleStartGameMessage(payload)
+		} else {
+			log.Println("Invalid message format for StartGame")
+		}
 	case MakeMove:
-		c.handleMove(mDTO.Message)
+		if payload, err := unmarshalClientMessagePayload[MakeMovePayload](msg.Message); err == nil {
+			c.handleMakeMove(payload)
+		} else {
+			log.Println("Invalid message format for MakeMove")
+		}
 	}
 }
 
 // handleJoinRoomMessage finds room by room UUID and join if exist. Othewise, new room will be created
-func (c *Client) handleJoinRoomMessage(payload json.RawMessage) {
-	var jp JoinRoomPayload
-	err := json.Unmarshal(payload, &jp)
-	if err != nil {
-		log.Fatalf("error in unmarshalling JSON message %s", err)
-	}
-
-	log.Println("handleJoinRoomMessage:", jp)
-
+func (c *Client) handleJoinRoomMessage(jp JoinRoomPayload) {
 	r := c.hub.findRoomByUUID(jp.RoomUUID)
 	if r == nil {
 		r = c.hub.createRoom(jp.Name)
@@ -207,16 +222,7 @@ func (c *Client) handleJoinRoomMessage(payload json.RawMessage) {
 }
 
 // handleLeaveRoomMessage leave the room according to the room UUID
-func (c *Client) handleLeaveRoomMessage(payload json.RawMessage) {
-	log.Println("handleLeaveRoom")
-	var lp LeaveRoomPayload
-	err := json.Unmarshal(payload, &lp)
-	if err != nil {
-		log.Fatalf("error in unmarshalling JSON message %s", err)
-	}
-
-	log.Println("handleLeaveRoomMessage:", lp)
-
+func (c *Client) handleLeaveRoomMessage(lp LeaveRoomPayload) {
 	r := c.hub.findRoomByUUID(lp.RoomUUID)
 
 	_, ok := c.rooms[r]
@@ -227,13 +233,7 @@ func (c *Client) handleLeaveRoomMessage(payload json.RawMessage) {
 	r.unregister <- c
 }
 
-func (c *Client) handleStartGameMessage(payload json.RawMessage) {
-	var sp StartGamePayload
-	err := json.Unmarshal(payload, &sp)
-	if err != nil {
-		log.Fatalf("error in unmarshalling JSON message %s", err)
-	}
-
+func (c *Client) handleStartGameMessage(sp StartGamePayload) {
 	r := c.hub.findRoomByUUID(sp.RoomUUID)
 
 	_, ok := c.rooms[r]
@@ -257,7 +257,7 @@ func (c *Client) handleStartGameMessage(payload json.RawMessage) {
 	r.startGame()
 }
 
-func (c *Client) handleMove(payload json.RawMessage) {
+func (c *Client) handleMakeMove(mp MakeMovePayload) {
 	log.Println("handleMove")
 }
 

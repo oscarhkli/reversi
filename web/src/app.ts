@@ -63,7 +63,6 @@ interface Message {
   action: ServerMessageType.SendMessage;
   message: string;
   target: string;
-  sender: string;
 }
 
 interface RoomUpdatedMessage {
@@ -75,7 +74,6 @@ interface RoomUpdatedMessage {
     count: number;
   }
   target: string;
-  sender: string;
 }
 
 interface RegisterResponseMessage {
@@ -93,7 +91,6 @@ interface JoinRoomRequestMessage {
     name: string;
   };
   target: string;
-  sender: string;
 }
 
 interface StartGameMessage {
@@ -101,7 +98,6 @@ interface StartGameMessage {
   message: {
     roomUUID: string;
   };
-  sender: string;
 }
 
 interface GameErrorMessage {
@@ -135,7 +131,6 @@ interface JoinRoomResponseMessage {
     roomUUID: string;
   };
   target: string;
-  sender: string;
 }
 
 interface MakeMoveMessage {
@@ -144,7 +139,6 @@ interface MakeMoveMessage {
     roomUUID: string;
     point: Point;
   };
-  sender: string;
 }
 
 function register() {
@@ -246,7 +240,7 @@ function handleRoomClick(room: Room) {
       name: room.name,
     },
     target: "server",
-    sender: player.id,
+    // sender: player.id,
   };
   socket.send(JSON.stringify(message)); 
 }
@@ -304,7 +298,6 @@ function createRoom() {
       roomUUID: null
     },
     target: "server",
-    sender: player.id,
   };
   socket.send(JSON.stringify(message));
 }
@@ -315,7 +308,6 @@ function handleStartGameRequest() {
     message: {
       roomUUID: roomUUID
     },
-    sender: player.id
   };
   socket.send(JSON.stringify(message));
 }
@@ -420,7 +412,6 @@ function handleCellClick(row: number, col: number) {
         y: row,
       },
     },
-    sender: player.id,
   }
   socket.send(JSON.stringify(msg));
 }
