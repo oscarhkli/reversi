@@ -15,8 +15,6 @@
         <input type="text" id="newRoomName" placeholder="Enter new room name" />
         <button id="createRoom">Create Room</button>
     </div>
-    <div id="messageLogs">
-    </div>
     <button id="start">Start Game</button>
     <div id="gameboard" hidden="true">
         <div id="p1">
@@ -32,6 +30,7 @@
             Turn <label id="turn"></label>
         </div>
         <div id="board"></div>
+        <textarea id="messageLogs" rows="20" cols="60"></textarea>
     </div>
     <script src="./static/app.js?v={{ .Version }}"></script>
 </body>

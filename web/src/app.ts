@@ -1,9 +1,6 @@
 const nameInput = document.getElementById("name") as HTMLInputElement;
 const registerButton = document.getElementById("register") as HTMLButtonElement;
-// const hubElement = document.getElementById("hub") as HTMLDivElement;
-const roomsElement = document.getElementById("rooms") as HTMLDivElement;
 const createRoomButton = document.getElementById("createRoom") as HTMLButtonElement;
-// const joinButton = document.getElementById("join") as HTMLButtonElement;
 const boardElement = document.getElementById("board") as HTMLDivElement;
 const startButton = document.getElementById("start") as HTMLButtonElement;
 const gameboardElement = document.getElementById("gameboard") as HTMLDivElement
@@ -107,6 +104,7 @@ interface GameErrorMessage {
 
 interface GameStatePlayer {
   id: string;
+  name: string;
   token: number;
   score: number;
   possibleMoves: Point[]
@@ -176,7 +174,11 @@ const serverMessageHandler: Record<ServerMessageType, (msg: ServerMessage) => vo
 }
 
 function handleServerGeneralMessage(resp: Message) {
-  console.log(resp);
+  const messageLogs = document.getElementById("messageLogs") as HTMLTextAreaElement;
+  if (messageLogs.textContent) {
+    messageLogs.textContent += "\n";
+  }
+  messageLogs.textContent += resp.message;
 }
 
 function handleRoomUpdatedMessage(resp: RoomUpdatedMessage) {
@@ -198,6 +200,7 @@ function handleRoomUpdatedMessage(resp: RoomUpdatedMessage) {
 
 function handleUpsertRoom(room: Room) {
   rooms.set(room.roomUUID, room); 
+  const roomsElement = document.getElementById("rooms") as HTMLDivElement;
   roomsElement.replaceChildren();
   roomsElement.innerHTML = "";
 
@@ -240,7 +243,6 @@ function handleRoomClick(room: Room) {
       name: room.name,
     },
     target: "server",
-    // sender: player.id,
   };
   socket.send(JSON.stringify(message)); 
 }
@@ -314,11 +316,11 @@ function handleStartGameRequest() {
 
 function renderGameBoard(resp: GameStateMessage) {
   const p1Name = document.getElementById("p1Name") as HTMLLabelElement;
-  p1Name.textContent = resp.message.p1.id; // TODO: need name from backend
+  p1Name.textContent = resp.message.p1.name; // TODO: need name from backend
   const p1Score = document.getElementById("p1Score") as HTMLLabelElement;
   p1Score.textContent = resp.message.p1.score.toString();
   const p2Name = document.getElementById("p2Name") as HTMLLabelElement;;
-  p2Name.textContent = resp.message.p2.id; // TODO: need name from backend
+  p2Name.textContent = resp.message.p2.name; // TODO: need name from backend
   const p2Score = document.getElementById("p2Score") as HTMLLabelElement;
   p2Score.textContent = resp.message.p2.score.toString();
 
@@ -392,9 +394,9 @@ function renderBoard(resp: GameStateMessage) {
     ? resp.message.p1.possibleMoves
     : resp.message.p2.possibleMoves;
   possibleMoves
-    .map((move) => getBoardCell(move.x, move.y))
+    .map((move) => getBoardCell(move.y, move.x))
     .forEach((cell) => {
-      cell.style.backgroundColor = "LightCyan";
+      cell.style.backgroundColor = "RoyalBlue";
       cell.onclick = () => handleCellClick(Number(cell.dataset.row), Number(cell.dataset.col));
     });
 }

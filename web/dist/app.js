@@ -1,10 +1,7 @@
 "use strict";
 const nameInput = document.getElementById("name");
 const registerButton = document.getElementById("register");
-// const hubElement = document.getElementById("hub") as HTMLDivElement;
-const roomsElement = document.getElementById("rooms");
 const createRoomButton = document.getElementById("createRoom");
-// const joinButton = document.getElementById("join") as HTMLButtonElement;
 const boardElement = document.getElementById("board");
 const startButton = document.getElementById("start");
 const gameboardElement = document.getElementById("gameboard");
@@ -65,7 +62,11 @@ const serverMessageHandler = {
     [ServerMessageType.GameState]: (msg) => handleGameState(msg),
 };
 function handleServerGeneralMessage(resp) {
-    console.log(resp);
+    const messageLogs = document.getElementById("messageLogs");
+    if (messageLogs.textContent) {
+        messageLogs.textContent += "\n";
+    }
+    messageLogs.textContent += resp.message;
 }
 function handleRoomUpdatedMessage(resp) {
     const room = {
@@ -85,6 +86,7 @@ function handleRoomUpdatedMessage(resp) {
 }
 function handleUpsertRoom(room) {
     rooms.set(room.roomUUID, room);
+    const roomsElement = document.getElementById("rooms");
     roomsElement.replaceChildren();
     roomsElement.innerHTML = "";
     for (const room of rooms.values()) {
@@ -122,7 +124,6 @@ function handleRoomClick(room) {
             name: room.name,
         },
         target: "server",
-        // sender: player.id,
     };
     socket.send(JSON.stringify(message));
 }
@@ -186,12 +187,12 @@ function handleStartGameRequest() {
 }
 function renderGameBoard(resp) {
     const p1Name = document.getElementById("p1Name");
-    p1Name.textContent = resp.message.p1.id; // TODO: need name from backend
+    p1Name.textContent = resp.message.p1.name; // TODO: need name from backend
     const p1Score = document.getElementById("p1Score");
     p1Score.textContent = resp.message.p1.score.toString();
     const p2Name = document.getElementById("p2Name");
     ;
-    p2Name.textContent = resp.message.p2.id; // TODO: need name from backend
+    p2Name.textContent = resp.message.p2.name; // TODO: need name from backend
     const p2Score = document.getElementById("p2Score");
     p2Score.textContent = resp.message.p2.score.toString();
     const p1 = document.getElementById("p1");
@@ -261,9 +262,9 @@ function renderBoard(resp) {
         ? resp.message.p1.possibleMoves
         : resp.message.p2.possibleMoves;
     possibleMoves
-        .map((move) => getBoardCell(move.x, move.y))
+        .map((move) => getBoardCell(move.y, move.x))
         .forEach((cell) => {
-        cell.style.backgroundColor = "LightCyan";
+        cell.style.backgroundColor = "RoyalBlue";
         cell.onclick = () => handleCellClick(Number(cell.dataset.row), Number(cell.dataset.col));
     });
 }

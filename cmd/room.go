@@ -103,11 +103,11 @@ func (r *Room) startGame() {
 	var p1, p2 *Player
 	for c := range r.clients {
 		if p1 == nil {
-			p1 = NewPlayer(1, WithName(c.ID.String()))
+			p1 = NewPlayer(1, WithID(c.ID), WithName(c.name))
 			continue
 		}
 		if p2 == nil {
-			p2 = NewPlayer(2, WithName(c.ID.String()))
+			p2 = NewPlayer(2, WithID(c.ID), WithName(c.name))
 		}
 	}
 
@@ -132,8 +132,9 @@ func (r *Room) broadcastGameState() {
 
 	constructPlayerPayload := func(p *Player) PlayerPayload {
 		return PlayerPayload{
-			ID:            p.name,
-			Token:         p.id,
+			ID:            p.id.String(),
+			Name:          p.name,
+			Token:         p.token,
 			Score:         p.score,
 			PossibleMoves: getPossibleMoves(p.possibleMoves),
 		}
@@ -146,11 +147,32 @@ func (r *Room) broadcastGameState() {
 			P2:            constructPlayerPayload(r.gameBoard.p2),
 			Round:         r.round,
 			Turn:          r.gameBoard.turn,
-			CurrentPlayer: r.gameBoard.CurrentPlayer().name,
+			CurrentPlayer: r.gameBoard.CurrentPlayer().id.String(),
 			Board:         r.gameBoard.board,
 		},
 		Target: r.uuid,
 	}
 
 	r.broadcastToClientsInRoom(m)
+}
+
+func (r *Room) handleMove(c *Client, p Point) {
+	if r.gameBoard.CurrentPlayer().id != c.ID {
+		log.Println("wrong sequence")
+		return
+	}
+
+	flips, err := r.gameBoard.Mark(p, *r.gameBoard.CurrentPlayer())
+	if err != nil {
+		log.Fatal("invalid move")
+	}
+
+	m := &Message{
+		Action:  SendMessage,
+		Message: fmt.Sprintf("%v flips %v disks", c.name, flips),
+		Target:  r.uuid,
+	}
+	r.broadcastToClientsInRoom(m)
+	r.gameBoard.RefreshState()
+	r.broadcastGameState()
 }

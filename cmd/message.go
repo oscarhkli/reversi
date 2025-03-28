@@ -70,6 +70,7 @@ type RoomUpdatedPayload struct {
 
 type PlayerPayload struct {
 	ID            string  `json:"id"`
+	Name          string  `json:"name"`
 	Token         int     `json:"token"`
 	Score         int     `json:"score"`
 	PossibleMoves []Point `json:"possibleMoves"`

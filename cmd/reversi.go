@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -44,7 +46,8 @@ const (
 )
 
 type Player struct {
-	id            int
+	id            uuid.UUID
+	token         int
 	name          string
 	score         int
 	possibleMoves map[Point][]Point
@@ -52,11 +55,18 @@ type Player struct {
 }
 
 type PlayerCfg struct {
+	id         uuid.UUID
 	name       string
 	playerType PlayerType
 }
 
 type PlayerCfgFunc func(playerCfg *PlayerCfg)
+
+func WithID(id uuid.UUID) PlayerCfgFunc {
+	return func(playerCfg *PlayerCfg) {
+		playerCfg.id = id
+	}
+}
 
 func WithName(name string) PlayerCfgFunc {
 	return func(playerCfg *PlayerCfg) {
@@ -70,7 +80,7 @@ func WithPlayerType(playerType PlayerType) PlayerCfgFunc {
 	}
 }
 
-func NewPlayer(id int, cfgFuncs ...PlayerCfgFunc) *Player {
+func NewPlayer(token int, cfgFuncs ...PlayerCfgFunc) *Player {
 	var config PlayerCfg
 	for _, cfgFunc := range cfgFuncs {
 		cfgFunc(&config)
@@ -79,6 +89,13 @@ func NewPlayer(id int, cfgFuncs ...PlayerCfgFunc) *Player {
 	playerType := Human
 	if config.playerType != Unknown {
 		playerType = config.playerType
+	}
+
+	var id uuid.UUID
+	if len(config.id) == 0 {
+		id = uuid.New()
+	} else {
+		id = config.id
 	}
 
 	var name string
@@ -90,11 +107,12 @@ func NewPlayer(id int, cfgFuncs ...PlayerCfgFunc) *Player {
 		} else {
 			name = "C"
 		}
-		name += strconv.Itoa(id)
+		name += strconv.Itoa(token)
 	}
 
 	return &Player{
 		id:            id,
+		token:         token,
 		name:          name,
 		score:         0,
 		possibleMoves: make(map[Point][]Point),
@@ -121,7 +139,7 @@ func (p *Player) randomChooseMove() (Point, error) {
 	for point := range p.possibleMoves {
 		return point, nil
 	}
-	return Point{}, errors.New(fmt.Sprintf("unexpected error: possibleMoves of %v is empty", p.name))
+	return Point{}, fmt.Errorf("unexpected error: possibleMoves of %v is empty", p.name)
 }
 
 func (p *Player) humanChooseMove() (Point, error) {
@@ -311,9 +329,9 @@ func (g *GameBoard) Mark(point Point, player Player) (int, error) {
 	if !ok {
 		return 0, errors.New("invalid move")
 	}
-	g.board[point.Y][point.X] = player.id
+	g.board[point.Y][point.X] = player.token
 	for _, p := range v {
-		g.board[p.Y][p.X] = player.id
+		g.board[p.Y][p.X] = player.token
 	}
 	return len(v) + 1, nil
 }
@@ -347,13 +365,13 @@ func (g GameBoard) Result() *Player {
 	return nil
 }
 
-func createPlayer(id int) *Player {
-	fmt.Printf("Settings for Player %d\n", id)
+func createPlayer(token int) *Player {
+	fmt.Printf("Settings for Player %d\n", token)
 	fmt.Printf("Name (empty for default name): ")
 	var name string
 	fmt.Scanln(&name)
 
-	fmt.Printf("Is Player %d a human (y/n/others = human): ", id)
+	fmt.Printf("Is Player %d a human (y/n/others = human): ", token)
 	var isHuman string
 	fmt.Scanln(&isHuman)
 
@@ -361,7 +379,7 @@ func createPlayer(id int) *Player {
 	if isHuman == "n" {
 		playerType = Computer
 	}
-	return NewPlayer(id, WithName(name), WithPlayerType(playerType))
+	return NewPlayer(token, WithName(name), WithPlayerType(playerType))
 }
 
 func amain() {

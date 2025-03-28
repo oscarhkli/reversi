@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -258,7 +257,8 @@ func (c *Client) handleStartGameMessage(sp StartGamePayload) {
 }
 
 func (c *Client) handleMakeMove(mp MakeMovePayload) {
-	log.Println("handleMove")
+	r := c.hub.findRoomByUUID(mp.RoomUUID)
+	r.handleMove(c, mp.Point)
 }
 
 // serveWs handles websocket requests from the peer.
