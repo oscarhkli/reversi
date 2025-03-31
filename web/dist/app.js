@@ -4,7 +4,7 @@ const registerButton = document.getElementById("register");
 const createRoomButton = document.getElementById("createRoom");
 const boardElement = document.getElementById("board");
 const startButton = document.getElementById("start");
-const gameboardElement = document.getElementById("gameboard");
+const roomElement = document.getElementById("room");
 const serverUrl = "ws://localhost:8080/ws";
 let socket;
 let roomUUID;
@@ -27,46 +27,55 @@ var ServerMessageType;
     ServerMessageType["RoomUpdated"] = "ROOM_UPDATED";
     ServerMessageType["RegisterResponse"] = "REGISTER_RESPONSE";
     ServerMessageType["JoinRoomResponse"] = "JOIN_ROOM_RESPONSE";
+    ServerMessageType["LeaveRoomResponse"] = "LEAVE_ROOM_RESPONSE";
     ServerMessageType["GameError"] = "GAME_ERROR";
     ServerMessageType["GameState"] = "GAME_STATE";
+    ServerMessageType["GameResult"] = "GAME_RESULT";
 })(ServerMessageType || (ServerMessageType = {}));
 function register() {
     const name = nameInput.value;
-    if (name) {
-        socket = new WebSocket(`${serverUrl}?name=${name}`);
-        socket.onopen = () => console.log("Socket conected with WebSocket state:", socket.readyState);
-        socket.onmessage = (event) => {
-            try {
-                const resp = JSON.parse(event.data);
-                const handler = serverMessageHandler[resp.action];
-                if (!handler) {
-                    console.error("Unknown message", event.data);
-                    return;
-                }
-                handler(resp);
-            }
-            catch (e) {
-                console.error("Exception caught when handling event:", event.data, e);
-            }
-        };
-        socket.onclose = () => console.log("Socket closed");
-        socket.onerror = (error) => console.error("WebSocket error:", error);
+    if (!name) {
+        return;
     }
+    registerButton.disabled = true;
+    socket = new WebSocket(`${serverUrl}?name=${name}`);
+    socket.onopen = () => console.log("Socket conected with WebSocket state:", socket.readyState);
+    socket.onmessage = (event) => {
+        try {
+            const resp = JSON.parse(event.data);
+            const handler = serverMessageHandler[resp.action];
+            if (!handler) {
+                console.error("Unknown message", event.data);
+                return;
+            }
+            handler(resp);
+        }
+        catch (e) {
+            console.error("Exception caught when handling event:", event.data, e);
+        }
+    };
+    socket.onclose = () => console.log("Socket closed");
+    socket.onerror = (error) => console.error("WebSocket error:", error);
 }
 const serverMessageHandler = {
     [ServerMessageType.SendMessage]: (msg) => handleServerGeneralMessage(msg),
     [ServerMessageType.RoomUpdated]: (msg) => handleRoomUpdatedMessage(msg),
     [ServerMessageType.RegisterResponse]: (msg) => handleRegisterResponse(msg),
     [ServerMessageType.JoinRoomResponse]: (msg) => handleJoinRoomResponse(msg),
+    [ServerMessageType.LeaveRoomResponse]: (msg) => handleLeaveRoomResponse(msg),
     [ServerMessageType.GameError]: (msg) => handleGameError(msg),
     [ServerMessageType.GameState]: (msg) => handleGameState(msg),
+    [ServerMessageType.GameResult]: (msg) => handleGameResult(msg),
 };
-function handleServerGeneralMessage(resp) {
+function appendMessageLogs(msg) {
     const messageLogs = document.getElementById("messageLogs");
     if (messageLogs.textContent) {
         messageLogs.textContent += "\n";
     }
-    messageLogs.textContent += resp.message;
+    messageLogs.textContent += msg;
+}
+function handleServerGeneralMessage(resp) {
+    appendMessageLogs(resp.message);
 }
 function handleRoomUpdatedMessage(resp) {
     const room = {
@@ -90,42 +99,51 @@ function handleUpsertRoom(room) {
     roomsElement.replaceChildren();
     roomsElement.innerHTML = "";
     for (const room of rooms.values()) {
-        const roomElement = document.createElement("div");
-        roomElement.className = "room";
-        roomElement.style.border = '1px solid #ccc';
-        roomElement.style.padding = '10px';
-        roomElement.style.margin = '5px';
-        roomElement.style.width = "100px";
-        roomElement.style.height = "50px";
-        roomElement.style.cursor = "pointer";
+        const roomSelectElement = document.createElement("div");
+        roomSelectElement.className = "room";
+        roomSelectElement.style.border = '1px solid #ccc';
+        roomSelectElement.style.padding = '10px';
+        roomSelectElement.style.margin = '5px';
+        roomSelectElement.style.width = "100px";
+        roomSelectElement.style.height = "50px";
+        roomSelectElement.style.cursor = "pointer";
         const label = document.createElement("p");
         label.textContent = `${room.name}: ${room.count}/2`;
-        roomElement.appendChild(label);
+        roomSelectElement.appendChild(label);
         if (room.count == 2) {
-            roomElement.style.opacity = "0.5";
-            roomElement.style.pointerEvents = "none";
+            roomSelectElement.style.opacity = "0.5";
+            roomSelectElement.style.pointerEvents = "none";
         }
         else {
-            roomElement.onclick = () => handleRoomClick(room);
+            roomSelectElement.onclick = () => handleRoomClick(room);
         }
-        roomsElement.appendChild(roomElement);
+        roomsElement.appendChild(roomSelectElement);
     }
 }
 function handleRoomClick(room) {
-    console.log("join room");
     if (!socket || socket.readyState !== WebSocket.OPEN) {
         console.error("WebSocket is not connected.");
         return;
     }
-    const message = {
-        action: MessageType.JoinRoom,
-        message: {
-            roomUUID: room.roomUUID,
-            name: room.name,
-        },
-        target: "server",
-    };
-    socket.send(JSON.stringify(message));
+    if (roomUUID) {
+        const message = {
+            action: MessageType.LeaveRoom,
+            message: {
+                roomUUID: room.roomUUID,
+            },
+        };
+        socket.send(JSON.stringify(message));
+    }
+    else {
+        const message = {
+            action: MessageType.JoinRoom,
+            message: {
+                roomUUID: room.roomUUID,
+                name: room.name,
+            },
+        };
+        socket.send(JSON.stringify(message));
+    }
 }
 function handleDeleteRoom(room) {
     rooms.delete(room.roomUUID);
@@ -144,7 +162,19 @@ function handleRegisterResponse(resp) {
 }
 function handleJoinRoomResponse(resp) {
     roomUUID = resp.message.roomUUID;
-    console.log(`roomUUID: ${roomUUID}`);
+    renderEmptyBoard();
+    roomElement.style.display = "flex";
+    roomElement.hidden = false;
+}
+function handleLeaveRoomResponse(resp) {
+    if (roomUUID == resp.message.roomUUID) {
+        roomUUID = null;
+        roomElement.style.display = "none";
+        roomElement.hidden = true;
+    }
+    else {
+        console.error("unrelated message", resp);
+    }
 }
 function handleGameError(resp) {
     console.error(resp.message);
@@ -152,9 +182,21 @@ function handleGameError(resp) {
 function handleGameState(resp) {
     // TODO: use another event handler for start game response
     startButton.disabled = true;
-    renderEmptyBoard();
-    gameboardElement.hidden = false;
     renderGameBoard(resp);
+}
+function handleGameResult(resp) {
+    if (!resp.message) {
+        // Draw
+        appendMessageLogs("Draw game!");
+    }
+    else if (resp.message == player.id) {
+        appendMessageLogs("You win!");
+    }
+    else {
+        appendMessageLogs("You lose!");
+    }
+    startButton.textContent = "Restart";
+    startButton.disabled = false;
 }
 function createRoom() {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -166,13 +208,13 @@ function createRoom() {
     if (!roomName) {
         roomName = "Untitled Room";
     }
+    createRoomButton.disabled = true;
     const message = {
         action: MessageType.JoinRoom,
         message: {
             name: roomName,
             roomUUID: null
         },
-        target: "server",
     };
     socket.send(JSON.stringify(message));
 }
@@ -216,6 +258,7 @@ function renderEmptyBoard() {
     boardElement.hidden = false;
     for (let row = 0; row < 8; row++) {
         const rowDiv = document.createElement("div");
+        rowDiv.classList.add("board-row");
         for (let col = 0; col < 8; col++) {
             const cell = document.createElement("button");
             cell.classList.add("board-cell");
@@ -231,6 +274,8 @@ function renderEmptyBoard() {
     console.log("created");
 }
 function isCurrentPlayer(resp) {
+    console.log(resp.message.currentPlayer, player.id);
+    console.log(resp.message.currentPlayer === player.id);
     return resp.message.currentPlayer === player.id;
 }
 function getBoardCell(i, j) {
@@ -240,10 +285,8 @@ function renderBoard(resp) {
     for (let i = 0; i < 8; i++) {
         for (let j = 0; j < 8; j++) {
             const token = resp.message.board[i][j];
-            if (token == 0) {
-                continue;
-            }
             const cell = getBoardCell(i, j);
+            cell.disabled = true;
             if (token == 1) {
                 cell.style.backgroundColor = "Black";
             }
@@ -251,7 +294,7 @@ function renderBoard(resp) {
                 cell.style.backgroundColor = "White";
             }
             else {
-                cell.style.backgroundColor = "Gainsboro";
+                cell.style.backgroundColor = "DarkGreen";
             }
         }
     }
@@ -261,9 +304,13 @@ function renderBoard(resp) {
     const possibleMoves = (resp.message.p1.id === player.id)
         ? resp.message.p1.possibleMoves
         : resp.message.p2.possibleMoves;
+    if (!possibleMoves) {
+        return;
+    }
     possibleMoves
         .map((move) => getBoardCell(move.y, move.x))
         .forEach((cell) => {
+        cell.disabled = false;
         cell.style.backgroundColor = "RoyalBlue";
         cell.onclick = () => handleCellClick(Number(cell.dataset.row), Number(cell.dataset.col));
     });

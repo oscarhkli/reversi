@@ -54,6 +54,7 @@ func (r *Room) unregisterClientInRoom(client *Client) {
 	if _, ok := r.clients[client]; ok {
 		delete(r.clients, client)
 		client.hub.broadcastRoomUpdated(r, "UPDATED")
+		r.notifyClientLeaveRoomResult(client)
 		r.notifyClientLeft(client)
 	}
 }
@@ -84,6 +85,16 @@ func (r *Room) notifyClientJoined(client *Client) {
 	}
 
 	r.broadcastToClientsInRoom(message)
+}
+
+func (r *Room) notifyClientLeaveRoomResult(client *Client) {
+	message := Message{
+		Action: LeaveRoomResponse,
+		Message: LeaveRoomPayload{
+			RoomUUID: r.uuid,
+		},
+	}
+	client.send <- message.encode()
 }
 
 // notifyClientLeft broadcasts message to the room about a client left
@@ -139,7 +150,7 @@ func (r *Room) broadcastGameState() {
 			PossibleMoves: getPossibleMoves(p.possibleMoves),
 		}
 	}
-
+log.Println(r.gameBoard.CurrentPlayer().id)
 	m := &Message{
 		Action: GameState,
 		Message: GameStatePayload{
@@ -164,7 +175,14 @@ func (r *Room) handleMove(c *Client, p Point) {
 
 	flips, err := r.gameBoard.Mark(p, *r.gameBoard.CurrentPlayer())
 	if err != nil {
-		log.Fatal("invalid move")
+		log.Println("invalid move")
+		m := &Message{
+			Action: SendMessage,
+			Message: fmt.Sprintf("Invalid move for %v. Try again.", c.name),
+			Target: r.uuid,
+		}
+		r.broadcastToClientsInRoom(m)
+		return
 	}
 
 	m := &Message{
@@ -175,4 +193,29 @@ func (r *Room) handleMove(c *Client, p Point) {
 	r.broadcastToClientsInRoom(m)
 	r.gameBoard.RefreshState()
 	r.broadcastGameState()
+	
+	if r.gameBoard.EndGame() {
+		// Announce winner
+		winner := r.gameBoard.Result()
+		m := &Message{
+			Action: GameResult,
+			Target: r.uuid,
+		}
+		if winner != nil {
+			m.Message = winner.id.String()
+		}
+		r.broadcastToClientsInRoom(m)
+		return
+	}
+
+	if len(r.gameBoard.CurrentPlayer().possibleMoves) == 0 {
+		m = &Message{
+			Action:  SendMessage,
+			Message: fmt.Sprintf("%v has no possibleMoves and is skipped.", r.gameBoard.CurrentPlayer().name),
+			Target:  r.uuid,
+		}
+		r.broadcastToClientsInRoom(m)
+		r.broadcastGameState()
+	}
+
 }

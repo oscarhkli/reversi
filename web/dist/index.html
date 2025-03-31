@@ -16,20 +16,22 @@
         <button id="createRoom">Create Room</button>
     </div>
     <button id="start">Start Game</button>
-    <div id="gameboard" hidden="true">
-        <div id="p1">
-            <label id="p1Name"></label>&nbsp;<label id="p1Score"></label>
+    <div id="room">
+        <div id="gameboard">
+            <div>
+                Round <label id="round"></label>
+            </div>
+            <div id="p1">
+                Black:&nbsp;<label id="p1Name"></label>&nbsp;<label id="p1Score"></label>
+            </div>
+            <div id="p2">
+                White:&nbsp;<label id="p2Name"></label>&nbsp;<label id="p2Score"></label>
+            </div>
+            <div>
+                Turn <label id="turn"></label>
+            </div>
+            <div id="board"></div>
         </div>
-        <div id="p2">
-            <label id="p2Name"></label>&nbsp;<label id="p2Score"></label>
-        </div>
-        <div>
-            Round <label id="round"></label>
-        </div>
-        <div>
-            Turn <label id="turn"></label>
-        </div>
-        <div id="board"></div>
         <textarea id="messageLogs" rows="20" cols="60"></textarea>
     </div>
     <script src="./static/app.js?v={{ .Version }}"></script>

@@ -2,9 +2,20 @@
   display: grid;
   margin: 10px;
 }
-/* button {
-  font-size: 24px;
-} */
 button.board-cell {
-  background-color: darkgreen
-};
+  background-color: darkgreen;
+}
+.board-row {
+  display: flex;
+  flex-wrap: nowrap;
+}
+#rooms {
+  display: flex;
+}
+#room {
+  display: none;
+  align-items: flex-start;
+  vertical-align: top;
+  flex-wrap: no-wrap;
+  gap: 10px;
+}

@@ -16,8 +16,10 @@ const (
 	GameError        MessageType = "GAME_ERROR"
 	GameState        MessageType = "GAME_STATE"
 	MakeMove         MessageType = "MAKE_MOVE"
+	GameResult       MessageType = "GAME_RESULT"
 	RegisterResponse MessageType = "REGISTER_RESPONSE"
 	JoinRoomResponse MessageType = "JOIN_ROOM_RESPONSE"
+	LeaveRoomResponse MessageType = "LEAVE_ROOM_RESPONSE"
 )
 
 type Message struct {
