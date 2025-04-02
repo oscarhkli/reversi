@@ -81,7 +81,7 @@ function handleRoomUpdatedMessage(resp) {
     const room = {
         roomUUID: resp.message.roomUUID,
         name: resp.message.name,
-        count: resp.message.count
+        count: resp.message.count,
     };
     switch (resp.message.action) {
         case "ADDED":
@@ -101,9 +101,9 @@ function handleUpsertRoom(room) {
     for (const room of rooms.values()) {
         const roomSelectElement = document.createElement("div");
         roomSelectElement.className = "room";
-        roomSelectElement.style.border = '1px solid #ccc';
-        roomSelectElement.style.padding = '10px';
-        roomSelectElement.style.margin = '5px';
+        roomSelectElement.style.border = "1px solid #ccc";
+        roomSelectElement.style.padding = "10px";
+        roomSelectElement.style.margin = "5px";
         roomSelectElement.style.width = "100px";
         roomSelectElement.style.height = "50px";
         roomSelectElement.style.cursor = "pointer";
@@ -213,16 +213,20 @@ function createRoom() {
         action: MessageType.JoinRoom,
         message: {
             name: roomName,
-            roomUUID: null
+            roomUUID: null,
         },
     };
     socket.send(JSON.stringify(message));
 }
 function handleStartGameRequest() {
+    if (!roomUUID) {
+        console.error("Player isn't in any room");
+        return;
+    }
     const message = {
         action: MessageType.StartGame,
         message: {
-            roomUUID: roomUUID
+            roomUUID: roomUUID,
         },
     };
     socket.send(JSON.stringify(message));
@@ -233,7 +237,6 @@ function renderGameBoard(resp) {
     const p1Score = document.getElementById("p1Score");
     p1Score.textContent = resp.message.p1.score.toString();
     const p2Name = document.getElementById("p2Name");
-    ;
     p2Name.textContent = resp.message.p2.name; // TODO: need name from backend
     const p2Score = document.getElementById("p2Score");
     p2Score.textContent = resp.message.p2.score.toString();
@@ -301,7 +304,7 @@ function renderBoard(resp) {
     if (!isCurrentPlayer(resp)) {
         return;
     }
-    const possibleMoves = (resp.message.p1.id === player.id)
+    const possibleMoves = resp.message.p1.id === player.id
         ? resp.message.p1.possibleMoves
         : resp.message.p2.possibleMoves;
     if (!possibleMoves) {
@@ -317,6 +320,11 @@ function renderBoard(resp) {
 }
 function handleCellClick(row, col) {
     if (!socket) {
+        console.error("No socket connection established");
+        return;
+    }
+    if (!roomUUID) {
+        console.error("Player isn't in any room");
         return;
     }
     const msg = {
