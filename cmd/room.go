@@ -8,9 +8,9 @@ import (
 )
 
 type Room struct {
-	name    string
-	uuid    string
-	clients map[*Client]bool
+	name       string
+	uuid       string
+	clients    map[*Client]bool
 	register   chan *Client
 	unregister chan *Client
 	broadcast  chan *Message
@@ -20,9 +20,9 @@ type Room struct {
 
 func NewRoom(name string) *Room {
 	return &Room{
-		name:    name,
-		uuid:    uuid.NewString(),
-		clients: make(map[*Client]bool),
+		name:       name,
+		uuid:       uuid.NewString(),
+		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		broadcast:  make(chan *Message),
@@ -127,12 +127,12 @@ func (r *Room) handleSurrender(client *Client) {
 		return
 	}
 
-	if (r.gameBoard.p1.id == client.ID) {
+	if r.gameBoard.p1.id == client.ID {
 		r.gameBoard.p1.surrender = true
 	} else {
 		r.gameBoard.p2.surrender = true
 	}
-	r.announceWinner();
+	r.announceWinner()
 }
 
 func (r *Room) startGame() {
@@ -255,5 +255,5 @@ func (r *Room) announceWinner() {
 	if winner != nil {
 		m.Message = winner.id.String()
 	}
-	r.broadcastToClientsInRoom(m)	
+	r.broadcastToClientsInRoom(m)
 }

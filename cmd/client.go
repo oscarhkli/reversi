@@ -57,11 +57,11 @@ type Client struct {
 
 func NewClient(conn *websocket.Conn, hub *Hub, name string) *Client {
 	return &Client{
-		name:  name,
-		hub:   hub,
-		conn:  conn,
-		send:  make(chan []byte, 256),
-		ID:    uuid.New(),
+		name: name,
+		hub:  hub,
+		conn: conn,
+		send: make(chan []byte, 256),
+		ID:   uuid.New(),
 		room: nil,
 	}
 }
@@ -222,7 +222,7 @@ func (c *Client) handleLeaveRoomMessage(lp LeaveRoomPayload) {
 			Message: "You are not in this room.",
 		}
 		c.send <- m.encode()
-		return	
+		return
 	}
 
 	c.room = nil
@@ -238,7 +238,7 @@ func (c *Client) handleStartGameMessage(sp StartGamePayload) {
 			Message: "You are not in this room.",
 		}
 		c.send <- m.encode()
-		return	
+		return
 	}
 
 	if len(r.clients) < 2 {
@@ -254,14 +254,14 @@ func (c *Client) handleStartGameMessage(sp StartGamePayload) {
 }
 
 func (c *Client) handleMakeMove(mp MakeMovePayload) {
-	r:= c.room
+	r := c.room
 	if r.uuid != mp.RoomUUID {
 		m := Message{
 			Action:  GameError,
 			Message: "You are not in this room.",
 		}
 		c.send <- m.encode()
-		return	
+		return
 	}
 
 	r.handleMove(c, mp.Point)
