@@ -231,12 +231,24 @@ function handleServerGeneralMessage(resp: Message) {
   appendMessageLogs(resp.message);
 }
 
+function updateRoomControl(room: Room) {
+  if (roomUUID !== room.roomUUID) {
+    return;
+  }
+  const currentRoomCountLabel = document.getElementById("currentRoomCount") as HTMLLabelElement;
+  currentRoomCountLabel.textContent = room.count.toString();
+  startButton.disabled = room.count != 2;
+}
+
 function handleRoomUpdatedMessage(resp: RoomUpdatedMessage) {
   const room: Room = {
     roomUUID: resp.message.roomUUID,
     name: resp.message.name,
     count: resp.message.count,
   };
+
+  updateRoomControl(room);
+
   switch (resp.message.action) {
     case "ADDED":
     case "UPDATED":
@@ -364,7 +376,7 @@ function handleGameResult(resp: Message) {
   } else {
     appendMessageLogs("You lose!");
   }
-  startButton.textContent = "Restart";
+
   startButton.disabled = false;
 }
 

@@ -52,7 +52,7 @@ type Client struct {
 	ID uuid.UUID `json:"id"`
 
 	// Rooms that client currently in
-	rooms map[*Room]bool
+	room *Room
 }
 
 func NewClient(conn *websocket.Conn, hub *Hub, name string) *Client {
@@ -62,7 +62,7 @@ func NewClient(conn *websocket.Conn, hub *Hub, name string) *Client {
 		conn:  conn,
 		send:  make(chan []byte, 256),
 		ID:    uuid.New(),
-		rooms: make(map[*Room]bool),
+		room: nil,
 	}
 }
 
@@ -131,10 +131,10 @@ func (c *Client) writePump() {
 	}
 }
 
-// disconnect unregisters both hub and rooms
+// disconnect unregisters both hub and room
 func (c *Client) disconnect() {
-	for r := range c.rooms {
-		r.unregister <- c
+	if c.room != nil {
+		c.room.unregister <- c
 	}
 	c.hub.unregister <- c
 }
@@ -164,15 +164,16 @@ func (c *Client) handleNewMessage(jsonMsg []byte) {
 
 	switch msg.Action {
 	case SendMessage:
-		room := c.hub.findRoomByUUID(msg.Target)
-		if room != nil {
+		r := c.room
+
+		if r != nil {
 			serverMsg := Message{
 				Action:  msg.Action,
 				Message: "",
 				Target:  msg.Target,
 				Sender:  msg.Sender,
 			}
-			room.broadcast <- &serverMsg
+			r.broadcast <- &serverMsg
 		}
 	case JoinRoom:
 		if payload, err := unmarshalClientMessagePayload[JoinRoomPayload](msg.Message); err == nil {
@@ -208,35 +209,38 @@ func (c *Client) handleJoinRoomMessage(jp JoinRoomPayload) {
 		r = c.hub.createRoom(jp.Name)
 	}
 
-	c.rooms[r] = true
+	c.room = r
 	r.register <- c
 }
 
 // handleLeaveRoomMessage leave the room according to the room UUID
 func (c *Client) handleLeaveRoomMessage(lp LeaveRoomPayload) {
-	log.Println("handleLeaveRoomMessage")
-	r := c.hub.findRoomByUUID(lp.RoomUUID)
-
-	_, ok := c.rooms[r]
-	if ok {
-		delete(c.rooms, r)
-	}
-
-	r.unregister <- c
-}
-
-func (c *Client) handleStartGameMessage(sp StartGamePayload) {
-	r := c.hub.findRoomByUUID(sp.RoomUUID)
-
-	_, ok := c.rooms[r]
-	if !ok {
+	r := c.room
+	if r.uuid != lp.RoomUUID {
 		m := Message{
 			Action:  GameError,
 			Message: "You are not in this room.",
 		}
 		c.send <- m.encode()
-		return
+		return	
 	}
+
+	c.room = nil
+
+	r.unregister <- c
+}
+
+func (c *Client) handleStartGameMessage(sp StartGamePayload) {
+	r := c.room
+	if r.uuid != sp.RoomUUID {
+		m := Message{
+			Action:  GameError,
+			Message: "You are not in this room.",
+		}
+		c.send <- m.encode()
+		return	
+	}
+
 	if len(r.clients) < 2 {
 		m := Message{
 			Action:  GameError,
@@ -250,7 +254,16 @@ func (c *Client) handleStartGameMessage(sp StartGamePayload) {
 }
 
 func (c *Client) handleMakeMove(mp MakeMovePayload) {
-	r := c.hub.findRoomByUUID(mp.RoomUUID)
+	r:= c.room
+	if r.uuid != mp.RoomUUID {
+		m := Message{
+			Action:  GameError,
+			Message: "You are not in this room.",
+		}
+		c.send <- m.encode()
+		return	
+	}
+
 	r.handleMove(c, mp.Point)
 }
 

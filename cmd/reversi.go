@@ -52,6 +52,7 @@ type Player struct {
 	score         int
 	possibleMoves map[Point][]Point
 	playerType    PlayerType
+	surrender     bool
 }
 
 type PlayerCfg struct {
@@ -117,6 +118,7 @@ func NewPlayer(token int, cfgFuncs ...PlayerCfgFunc) *Player {
 		score:         2,
 		possibleMoves: make(map[Point][]Point),
 		playerType:    playerType,
+		surrender:     false,
 	}
 }
 
@@ -357,12 +359,22 @@ func (g GameBoard) CurrentPlayer() *Player {
 }
 
 func (g GameBoard) Result() *Player {
+	if g.p1.surrender {
+		return g.p2
+	}
+	if g.p2.surrender {
+		return g.p1
+	}
 	if g.p1.score > g.p2.score {
 		return g.p1
 	} else if g.p1.score < g.p2.score {
 		return g.p2
 	}
 	return nil
+}
+
+func (g GameBoard) Surrender(p *Player) {
+	p.surrender = true
 }
 
 func createPlayer(token int) *Player {

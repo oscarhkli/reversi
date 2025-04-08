@@ -94,15 +94,6 @@ func (h *Hub) findRoomByUUID(uuid string) *Room {
 	return nil
 }
 
-func (h *Hub) findClientByID(id string) *Client {
-	for c := range h.clients {
-		if c.ID.String() == id {
-			return c
-		}
-	}
-	return nil
-}
-
 func (h *Hub) createRoom(name string) *Room {
 	r := NewRoom(name)
 	go r.Run()

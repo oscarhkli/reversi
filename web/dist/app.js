@@ -81,12 +81,21 @@ function appendMessageLogs(msg) {
 function handleServerGeneralMessage(resp) {
     appendMessageLogs(resp.message);
 }
+function updateRoomControl(room) {
+    if (roomUUID !== room.roomUUID) {
+        return;
+    }
+    const currentRoomCountLabel = document.getElementById("currentRoomCount");
+    currentRoomCountLabel.textContent = room.count.toString();
+    startButton.disabled = room.count != 2;
+}
 function handleRoomUpdatedMessage(resp) {
     const room = {
         roomUUID: resp.message.roomUUID,
         name: resp.message.name,
         count: resp.message.count,
     };
+    updateRoomControl(room);
     switch (resp.message.action) {
         case "ADDED":
         case "UPDATED":
@@ -199,7 +208,6 @@ function handleGameResult(resp) {
     else {
         appendMessageLogs("You lose!");
     }
-    startButton.textContent = "Restart";
     startButton.disabled = false;
 }
 function createRoom() {

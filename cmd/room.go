@@ -11,8 +11,6 @@ type Room struct {
 	name    string
 	uuid    string
 	clients map[*Client]bool
-	// p1 *Player
-	// p2 *Player
 	register   chan *Client
 	unregister chan *Client
 	broadcast  chan *Message
@@ -25,8 +23,6 @@ func NewRoom(name string) *Room {
 		name:    name,
 		uuid:    uuid.NewString(),
 		clients: make(map[*Client]bool),
-		// p1: nil,
-		// p2: nil,
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		broadcast:  make(chan *Message),
@@ -56,6 +52,10 @@ func (r *Room) registerClientInRoom(client *Client) {
 
 func (r *Room) unregisterClientInRoom(client *Client) {
 	if _, ok := r.clients[client]; ok {
+		if r.gameBoard != nil {
+			r.handleSurrender(client)
+			r.gameBoard = nil
+		}
 		delete(r.clients, client)
 		client.hub.broadcastRoomUpdated(r, "UPDATED")
 		r.notifyClientLeaveRoomResult(client)
@@ -122,6 +122,19 @@ func (r *Room) notifyClientLeft(client *Client) {
 	r.broadcastToClientsInRoom(message)
 }
 
+func (r *Room) handleSurrender(client *Client) {
+	if r.gameBoard == nil {
+		return
+	}
+
+	if (r.gameBoard.p1.id == client.ID) {
+		r.gameBoard.p1.surrender = true
+	} else {
+		r.gameBoard.p2.surrender = true
+	}
+	r.announceWinner();
+}
+
 func (r *Room) startGame() {
 	log.Println("startGame")
 	r.round++
@@ -142,6 +155,12 @@ func (r *Room) startGame() {
 	}
 	log.Println(p1, p2)
 	r.gameBoard = NewGameBoard(*p1, *p2, WithP1First(r.round%2 == 1), WithShowHint(true))
+	m := &Message{
+		Action:  SendMessage,
+		Message: "Game Start!",
+		Target:  r.uuid,
+	}
+	r.broadcastToClientsInRoom(m)
 	r.broadcastGameState()
 }
 
@@ -209,17 +228,7 @@ func (r *Room) handleMove(c *Client, p Point) {
 	r.broadcastGameState()
 
 	if r.gameBoard.EndGame() {
-		// Announce winner
-		winner := r.gameBoard.Result()
-
-		m := &Message{
-			Action: GameResult,
-			Target: r.uuid,
-		}
-		if winner != nil {
-			m.Message = winner.id.String()
-		}
-		r.broadcastToClientsInRoom(m)
+		r.announceWinner()
 		return
 	}
 
@@ -233,4 +242,18 @@ func (r *Room) handleMove(c *Client, p Point) {
 		r.broadcastGameState()
 	}
 
+}
+
+// announceWinner. To deduce winner and broadcast to the clients in the room
+func (r *Room) announceWinner() {
+	winner := r.gameBoard.Result()
+
+	m := &Message{
+		Action: GameResult,
+		Target: r.uuid,
+	}
+	if winner != nil {
+		m.Message = winner.id.String()
+	}
+	r.broadcastToClientsInRoom(m)	
 }
