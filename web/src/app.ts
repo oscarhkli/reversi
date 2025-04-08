@@ -1,10 +1,12 @@
 const nameInput = document.getElementById("name") as HTMLInputElement;
 const registerButton = document.getElementById("register") as HTMLButtonElement;
+const hubElement = document.getElementById("hub") as HTMLDivElement;
 const createRoomButton = document.getElementById(
   "createRoom"
 ) as HTMLButtonElement;
 const boardElement = document.getElementById("board") as HTMLDivElement;
 const startButton = document.getElementById("start") as HTMLButtonElement;
+const leaveRoomButton = document.getElementById("leaveRoom") as HTMLButtonElement;
 const roomElement = document.getElementById("room") as HTMLDivElement;
 const serverUrl = "ws://localhost:8080/ws";
 
@@ -83,6 +85,7 @@ interface RegisterResponseMessage {
   action: ServerMessageType.RegisterResponse;
   message: {
     id: string;
+    name: string;
     rooms: Room[];
   };
 }
@@ -139,6 +142,7 @@ interface JoinRoomResponseMessage {
   message: {
     success: boolean;
     roomUUID: string;
+    name: string;
   };
   target: string;
 }
@@ -166,6 +170,7 @@ function register() {
     return;
   }
 
+  nameInput.disabled = true;
   registerButton.disabled = true;
 
   socket = new WebSocket(`${serverUrl}?name=${name}`);
@@ -215,6 +220,7 @@ function appendMessageLogs(msg: string) {
   const messageLogs = document.getElementById(
     "messageLogs"
   ) as HTMLTextAreaElement;
+  messageLogs.scrollTop = messageLogs.scrollHeight;
   if (messageLogs.textContent) {
     messageLogs.textContent += "\n";
   }
@@ -280,23 +286,18 @@ function handleRoomClick(room: Room) {
   }
 
   if (roomUUID) {
-    const message: LeaveRoomRequestMessage = {
-      action: MessageType.LeaveRoom,
-      message: {
-        roomUUID: room.roomUUID,
-      },
-    };
-    socket.send(JSON.stringify(message));
-  } else {
-    const message: JoinRoomRequestMessage = {
-      action: MessageType.JoinRoom,
-      message: {
-        roomUUID: room.roomUUID,
-        name: room.name,
-      },
-    };
-    socket.send(JSON.stringify(message));
+    console.error("Player is in a room. Cannot join another");
+    return;
   }
+
+  const message: JoinRoomRequestMessage = {
+    action: MessageType.JoinRoom,
+    message: {
+      roomUUID: room.roomUUID,
+      name: room.name,
+    },
+  };
+  socket.send(JSON.stringify(message));
 }
 
 function handleDeleteRoom(room: Room) {
@@ -305,8 +306,16 @@ function handleDeleteRoom(room: Room) {
 
 function handleRegisterResponse(resp: RegisterResponseMessage) {
   player.id = resp.message.id;
-  player.name = nameInput.name;
-  console.log(resp.message.rooms);
+  player.name = resp.message.name;
+
+  const greetingNameLabel = document.getElementById("greetingName") as HTMLLabelElement;
+  greetingNameLabel.textContent = player.name;
+
+  const registrationElement = document.getElementById("registration") as HTMLDivElement;
+  registrationElement.hidden = true;
+  const mainElement = document.getElementById("main") as HTMLDivElement;
+  mainElement.hidden = false;
+
   resp.message.rooms
     .map((room) => ({
       roomUUID: room.roomUUID,
@@ -317,17 +326,20 @@ function handleRegisterResponse(resp: RegisterResponseMessage) {
 }
 
 function handleJoinRoomResponse(resp: JoinRoomResponseMessage) {
+  const roomNameLabel = document.getElementById("roomName") as HTMLLabelElement;
+  roomNameLabel.textContent = resp.message.name;
+  
+  hubElement.hidden = true
   roomUUID = resp.message.roomUUID;
   renderEmptyBoard();
-  roomElement.style.display = "flex";
   roomElement.hidden = false;
 }
 
 function handleLeaveRoomResponse(resp: LeaveRoomResponseMessage) {
   if (roomUUID == resp.message.roomUUID) {
     roomUUID = null;
-    roomElement.style.display = "none";
     roomElement.hidden = true;
+    hubElement.hidden = false
   } else {
     console.error("unrelated message", resp);
   }
@@ -397,11 +409,11 @@ function handleStartGameRequest() {
 
 function renderGameBoard(resp: GameStateMessage) {
   const p1Name = document.getElementById("p1Name") as HTMLLabelElement;
-  p1Name.textContent = resp.message.p1.name; // TODO: need name from backend
+  p1Name.textContent = resp.message.p1.name;
   const p1Score = document.getElementById("p1Score") as HTMLLabelElement;
   p1Score.textContent = resp.message.p1.score.toString();
   const p2Name = document.getElementById("p2Name") as HTMLLabelElement;
-  p2Name.textContent = resp.message.p2.name; // TODO: need name from backend
+  p2Name.textContent = resp.message.p2.name;
   const p2Score = document.getElementById("p2Score") as HTMLLabelElement;
   p2Score.textContent = resp.message.p2.score.toString();
 
@@ -513,6 +525,27 @@ function handleCellClick(row: number, col: number) {
   socket.send(JSON.stringify(msg));
 }
 
+function handleLeaveRoomClick() {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    console.error("WebSocket is not connected.");
+    return;
+  }
+
+  if (!roomUUID) {
+    console.error("Player isn't in any room")
+    return;
+  }
+
+  const message: LeaveRoomRequestMessage = {
+    action: MessageType.LeaveRoom,
+    message: {
+      roomUUID: roomUUID,
+    },
+  };
+  socket.send(JSON.stringify(message));
+}
+
 registerButton.onclick = register;
 createRoomButton.onclick = createRoom;
 startButton.onclick = handleStartGameRequest;
+leaveRoomButton.onclick = handleLeaveRoomClick;

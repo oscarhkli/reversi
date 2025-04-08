@@ -7,33 +7,55 @@
     <link href="./static/styles.css?v={{ .Version }}" rel="stylesheet" />
 </head>
 <body>
-    <h1>Reversi</h1>
-    <input type="text" id="name" placeholder="Enter your name" />
-    <button id="register">Register</button>
-    <div id="hub">
-        <div id="rooms"></div>
-        <input type="text" id="newRoomName" placeholder="Enter new room name" />
-        <button id="createRoom">Create Room</button>
-    </div>
-    <button id="start">Start Game</button>
-    <div id="room">
-        <div id="gameboard">
-            <div>
-                Round <label id="round"></label>
-            </div>
-            <div id="p1">
-                Black:&nbsp;<label id="p1Name"></label>&nbsp;<label id="p1Score"></label>
-            </div>
-            <div id="p2">
-                White:&nbsp;<label id="p2Name"></label>&nbsp;<label id="p2Score"></label>
-            </div>
-            <div>
-                Turn <label id="turn"></label>
-            </div>
-            <div id="board"></div>
+    <header>
+        <h1>Reversi</h1>
+    </header>
+
+    <main>
+        <div id="registration">
+            <input type="text" id="name" placeholder="Enter your name" />
+            <button id="register">Register</button>
         </div>
-        <textarea id="messageLogs" rows="20" cols="60"></textarea>
-    </div>
+ 
+        <div id="main" hidden>
+            <h2>Hello <label id="greetingName"></label></h2>
+            <div id="hub">
+                <div id="rooms"></div>
+                <input type="text" id="newRoomName" placeholder="Enter new room name" />
+                <button id="createRoom">Create Room</button>
+            </div>
+
+            <div id="room" hidden>
+                <div>
+                    You are in <label id="roomName"></label>
+                </div>
+                <div id="gameControl">
+                    <button id="start">Start Game</button>
+                    <button id="leaveRoom">Leave Room</button>
+                </div>
+
+                <div id="gameboardWithMessage">
+                    <div id="gameboard">
+                        <div>
+                            Round <label id="round" />
+                        </div>
+                        <div id="p1">
+                            Black:&nbsp;<label id="p1Name"></label>&nbsp;<label id="p1Score"></label>
+                        </div>
+                        <div id="p2">
+                            White:&nbsp;<label id="p2Name"></label>&nbsp;<label id="p2Score"></label>
+                        </div>
+                        <div>
+                            Turn <label id="turn"></label>
+                        </div>
+                        <div id="board"></div>
+                    </div>
+                    <textarea id="messageLogs" rows="20" cols="60"></textarea>
+                </div>
+            </div>
+        </div>
+    </main>
+
     <script src="./static/app.js?v={{ .Version }}"></script>
 </body>
 </html>

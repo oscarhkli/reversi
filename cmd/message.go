@@ -8,17 +8,17 @@ import (
 type MessageType string
 
 const (
-	SendMessage      MessageType = "SEND_MESSAGE"
-	RoomUpdated      MessageType = "ROOM_UPDATED"
-	JoinRoom         MessageType = "JOIN_ROOM"
-	LeaveRoom        MessageType = "LEAVE_ROOM"
-	StartGame        MessageType = "START_GAME"
-	GameError        MessageType = "GAME_ERROR"
-	GameState        MessageType = "GAME_STATE"
-	MakeMove         MessageType = "MAKE_MOVE"
-	GameResult       MessageType = "GAME_RESULT"
-	RegisterResponse MessageType = "REGISTER_RESPONSE"
-	JoinRoomResponse MessageType = "JOIN_ROOM_RESPONSE"
+	SendMessage       MessageType = "SEND_MESSAGE"
+	RoomUpdated       MessageType = "ROOM_UPDATED"
+	JoinRoom          MessageType = "JOIN_ROOM"
+	LeaveRoom         MessageType = "LEAVE_ROOM"
+	StartGame         MessageType = "START_GAME"
+	GameError         MessageType = "GAME_ERROR"
+	GameState         MessageType = "GAME_STATE"
+	MakeMove          MessageType = "MAKE_MOVE"
+	GameResult        MessageType = "GAME_RESULT"
+	RegisterResponse  MessageType = "REGISTER_RESPONSE"
+	JoinRoomResponse  MessageType = "JOIN_ROOM_RESPONSE"
 	LeaveRoomResponse MessageType = "LEAVE_ROOM_RESPONSE"
 )
 
@@ -40,6 +40,7 @@ func (m *Message) encode() []byte {
 
 type RegisterResponsePayload struct {
 	ID    string               `json:"id"`
+	Name  string               `json:"name"`
 	Rooms []RoomUpdatedPayload `json:"rooms"`
 }
 

@@ -12,8 +12,8 @@ button.board-cell {
 #rooms {
   display: flex;
 }
-#room {
-  display: none;
+#gameboardWithMessage {
+  display: flex;
   align-items: flex-start;
   vertical-align: top;
   flex-wrap: no-wrap;

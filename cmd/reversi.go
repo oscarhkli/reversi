@@ -114,7 +114,7 @@ func NewPlayer(token int, cfgFuncs ...PlayerCfgFunc) *Player {
 		id:            id,
 		token:         token,
 		name:          name,
-		score:         0,
+		score:         2,
 		possibleMoves: make(map[Point][]Point),
 		playerType:    playerType,
 	}

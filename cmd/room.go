@@ -8,9 +8,11 @@ import (
 )
 
 type Room struct {
-	name       string
-	uuid       string
-	clients    map[*Client]bool
+	name    string
+	uuid    string
+	clients map[*Client]bool
+	// p1 *Player
+	// p2 *Player
 	register   chan *Client
 	unregister chan *Client
 	broadcast  chan *Message
@@ -20,9 +22,11 @@ type Room struct {
 
 func NewRoom(name string) *Room {
 	return &Room{
-		name:       name,
-		uuid:       uuid.NewString(),
-		clients:    make(map[*Client]bool),
+		name:    name,
+		uuid:    uuid.NewString(),
+		clients: make(map[*Client]bool),
+		// p1: nil,
+		// p2: nil,
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		broadcast:  make(chan *Message),
@@ -88,13 +92,23 @@ func (r *Room) notifyClientJoined(client *Client) {
 }
 
 func (r *Room) notifyClientLeaveRoomResult(client *Client) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered in notifyClientLeaveRoomResult: %v", r)
+		}
+	}()
 	message := Message{
 		Action: LeaveRoomResponse,
 		Message: LeaveRoomPayload{
 			RoomUUID: r.uuid,
 		},
 	}
-	client.send <- message.encode()
+
+	select {
+	case client.send <- message.encode():
+	default:
+		log.Printf("client %v send closed", client.ID)
+	}
 }
 
 // notifyClientLeft broadcasts message to the room about a client left
@@ -150,7 +164,7 @@ func (r *Room) broadcastGameState() {
 			PossibleMoves: getPossibleMoves(p.possibleMoves),
 		}
 	}
-log.Println(r.gameBoard.CurrentPlayer().id)
+	log.Println(r.gameBoard.CurrentPlayer().id)
 	m := &Message{
 		Action: GameState,
 		Message: GameStatePayload{
@@ -177,9 +191,9 @@ func (r *Room) handleMove(c *Client, p Point) {
 	if err != nil {
 		log.Println("invalid move")
 		m := &Message{
-			Action: SendMessage,
+			Action:  SendMessage,
 			Message: fmt.Sprintf("Invalid move for %v. Try again.", c.name),
-			Target: r.uuid,
+			Target:  r.uuid,
 		}
 		r.broadcastToClientsInRoom(m)
 		return
@@ -193,10 +207,11 @@ func (r *Room) handleMove(c *Client, p Point) {
 	r.broadcastToClientsInRoom(m)
 	r.gameBoard.RefreshState()
 	r.broadcastGameState()
-	
+
 	if r.gameBoard.EndGame() {
 		// Announce winner
 		winner := r.gameBoard.Result()
+
 		m := &Message{
 			Action: GameResult,
 			Target: r.uuid,

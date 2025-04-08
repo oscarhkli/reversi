@@ -74,6 +74,7 @@ func NewClient(conn *websocket.Conn, hub *Hub, name string) *Client {
 func (c *Client) readPump() {
 	defer func() {
 		c.disconnect()
+		c.conn.Close()
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -118,13 +119,6 @@ func (c *Client) writePump() {
 			}
 			w.Write(message)
 
-			// Add queued chat messages to the current websocket message.
-			// n := len(c.send)
-			// for i := 0; i < n; i++ {
-			// 	w.Write(newline)
-			// 	w.Write(<-c.send)
-			// }
-
 			if err := w.Close(); err != nil {
 				return
 			}
@@ -139,12 +133,10 @@ func (c *Client) writePump() {
 
 // disconnect unregisters both hub and rooms
 func (c *Client) disconnect() {
-	c.hub.unregister <- c
 	for r := range c.rooms {
 		r.unregister <- c
 	}
 	c.hub.unregister <- c
-	c.conn.Close()
 }
 
 // unmarshalClientMessagePayload. Unmarshal msg.Message into the correct struct type
@@ -222,6 +214,7 @@ func (c *Client) handleJoinRoomMessage(jp JoinRoomPayload) {
 
 // handleLeaveRoomMessage leave the room according to the room UUID
 func (c *Client) handleLeaveRoomMessage(lp LeaveRoomPayload) {
+	log.Println("handleLeaveRoomMessage")
 	r := c.hub.findRoomByUUID(lp.RoomUUID)
 
 	_, ok := c.rooms[r]

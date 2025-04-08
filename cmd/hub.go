@@ -67,6 +67,7 @@ func (h *Hub) registerClient(client *Client) {
 		Action: RegisterResponse,
 		Message: RegisterResponsePayload{
 			ID:    client.ID.String(),
+			Name:  client.name,
 			Rooms: rooms,
 		},
 	}
