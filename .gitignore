@@ -46,5 +46,4 @@ yarn.lock
 pnpm-lock.yaml
 
 # Keep `index.html` and `styles.css` inside web/dist
-!/web/dist/index.html
-!/web/dist/styles.css
+/web/dist/js

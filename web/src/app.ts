@@ -1,3 +1,23 @@
+import {
+  GameErrorMessage,
+  GameStateMessage,
+  JoinRoomRequestMessage,
+  JoinRoomResponseMessage,
+  LeaveRoomRequestMessage,
+  LeaveRoomResponseMessage,
+  MakeMoveMessage,
+  Message,
+  ClientMessageType,
+  Player,
+  Point,
+  RegisterResponseMessage,
+  Room,
+  RoomUpdatedMessage,
+  ServerMessageType,
+  StartGameMessage,
+} from "./definitions.js";
+import { initWebSocket, registerHandler, sendSocketMessage as sendClientMessage } from "./websocket.js";
+
 const nameInput = document.getElementById("name") as HTMLInputElement;
 const registerButton = document.getElementById("register") as HTMLButtonElement;
 const hubElement = document.getElementById("hub") as HTMLDivElement;
@@ -6,27 +26,13 @@ const createRoomButton = document.getElementById(
 ) as HTMLButtonElement;
 const boardElement = document.getElementById("board") as HTMLDivElement;
 const startButton = document.getElementById("start") as HTMLButtonElement;
-const leaveRoomButton = document.getElementById("leaveRoom") as HTMLButtonElement;
+const leaveRoomButton = document.getElementById(
+  "leaveRoom"
+) as HTMLButtonElement;
 const roomElement = document.getElementById("room") as HTMLDivElement;
 const serverUrl = "ws://localhost:8080/ws";
 
-interface Player {
-  id: string;
-  name: string;
-}
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface Room {
-  roomUUID: string;
-  name: string;
-  count: number;
-}
-
-let socket: WebSocket;
+// let socket: WebSocket;
 let roomUUID: string | null;
 
 const rooms = new Map<string, Room>();
@@ -35,134 +41,6 @@ const player: Player = {
   id: "",
   name: "",
 };
-
-enum MessageType {
-  SendMessage = "SEND_MESSAGE",
-  JoinRoom = "JOIN_ROOM",
-  LeaveRoom = "LEAVE_ROOM",
-  StartGame = "START_GAME",
-  MakeMove = "MAKE_MOVE",
-}
-
-enum ServerMessageType {
-  SendMessage = "SEND_MESSAGE",
-  RoomUpdated = "ROOM_UPDATED",
-  RegisterResponse = "REGISTER_RESPONSE",
-  JoinRoomResponse = "JOIN_ROOM_RESPONSE",
-  LeaveRoomResponse = "LEAVE_ROOM_RESPONSE",
-  GameError = "GAME_ERROR",
-  GameState = "GAME_STATE",
-  GameResult = "GAME_RESULT",
-}
-
-type ServerMessage =
-  | Message
-  | RoomUpdatedMessage
-  | RegisterResponseMessage
-  | JoinRoomResponseMessage
-  | LeaveRoomResponseMessage
-  | GameErrorMessage
-  | GameStateMessage;
-
-interface Message {
-  action: ServerMessageType.SendMessage;
-  message: string;
-  target: string;
-}
-
-interface RoomUpdatedMessage {
-  action: ServerMessageType.RoomUpdated;
-  message: {
-    roomUUID: string;
-    action: "ADDED" | "UPDATED" | "DELETED";
-    name: string;
-    count: number;
-  };
-  target: string;
-}
-
-interface RegisterResponseMessage {
-  action: ServerMessageType.RegisterResponse;
-  message: {
-    id: string;
-    name: string;
-    rooms: Room[];
-  };
-}
-
-interface JoinRoomRequestMessage {
-  action: MessageType.JoinRoom;
-  message: {
-    roomUUID: string | null;
-    name: string;
-  };
-}
-
-interface LeaveRoomRequestMessage {
-  action: MessageType.LeaveRoom;
-  message: {
-    roomUUID: string;
-  };
-}
-
-interface StartGameMessage {
-  action: MessageType.StartGame;
-  message: {
-    roomUUID: string;
-  };
-}
-
-interface GameErrorMessage {
-  action: ServerMessageType.GameError;
-  message: string;
-}
-
-interface GameStatePlayer {
-  id: string;
-  name: string;
-  token: number;
-  score: number;
-  possibleMoves: Point[];
-}
-
-interface GameStateMessage {
-  action: ServerMessageType.GameState;
-  message: {
-    p1: GameStatePlayer;
-    p2: GameStatePlayer;
-    round: number;
-    turn: number;
-    currentPlayer: string; // player id
-    board: [][];
-  };
-}
-
-interface JoinRoomResponseMessage {
-  action: ServerMessageType.JoinRoomResponse;
-  message: {
-    success: boolean;
-    roomUUID: string;
-    name: string;
-  };
-  target: string;
-}
-
-interface LeaveRoomResponseMessage {
-  action: ServerMessageType.LeaveRoomResponse;
-  message: {
-    success: boolean;
-    roomUUID: string;
-  };
-  target: string;
-}
-
-interface MakeMoveMessage {
-  action: MessageType.MakeMove;
-  message: {
-    roomUUID: string;
-    point: Point;
-  };
-}
 
 function register() {
   const name = nameInput.value;
@@ -173,48 +51,36 @@ function register() {
   nameInput.disabled = true;
   registerButton.disabled = true;
 
-  socket = new WebSocket(`${serverUrl}?name=${name}`);
-  socket.onopen = () =>
-    console.log("Socket conected with WebSocket state:", socket.readyState);
-
-  socket.onmessage = (event) => {
-    try {
-      const resp: ServerMessage = JSON.parse(event.data);
-      const handler = serverMessageHandler[resp.action as ServerMessageType];
-      if (!handler) {
-        console.error("Unknown message", event.data);
-        return;
-      }
-      handler(resp);
-    } catch (e) {
-      console.error("Exception caught when handling event:", event.data, e);
-    }
-  };
-
-  socket.onclose = () => console.log("Socket closed");
-  socket.onerror = (error) => console.error("WebSocket error:", error);
+  initWebSocket(serverUrl, name);
 }
 
-const serverMessageHandler: Record<
-  ServerMessageType,
-  (msg: ServerMessage) => void
-> = {
-  [ServerMessageType.SendMessage]: (msg) =>
-    handleServerGeneralMessage(msg as Message),
-  [ServerMessageType.RoomUpdated]: (msg) =>
-    handleRoomUpdatedMessage(msg as RoomUpdatedMessage),
-  [ServerMessageType.RegisterResponse]: (msg) =>
-    handleRegisterResponse(msg as RegisterResponseMessage),
-  [ServerMessageType.JoinRoomResponse]: (msg) =>
-    handleJoinRoomResponse(msg as JoinRoomResponseMessage),
-  [ServerMessageType.LeaveRoomResponse]: (msg) =>
-    handleLeaveRoomResponse(msg as LeaveRoomResponseMessage),
-  [ServerMessageType.GameError]: (msg) =>
-    handleGameError(msg as GameErrorMessage),
-  [ServerMessageType.GameState]: (msg) =>
-    handleGameState(msg as GameStateMessage),
-  [ServerMessageType.GameResult]: (msg) => handleGameResult(msg as Message),
-};
+// export function registerHandler(type: ServerMessageType, handler: (msg: ServerMessage) => void)
+function initServerMessageHandlers() {
+  registerHandler(ServerMessageType.SendMessage, (msg) =>
+    handleServerGeneralMessage(msg as Message)
+  );
+  registerHandler(ServerMessageType.RoomUpdated, (msg) =>
+    handleRoomUpdatedMessage(msg as RoomUpdatedMessage)
+  );
+  registerHandler(ServerMessageType.RegisterResponse, (msg) =>
+    handleRegisterResponse(msg as RegisterResponseMessage)
+  );
+  registerHandler(ServerMessageType.JoinRoomResponse, (msg) =>
+    handleJoinRoomResponse(msg as JoinRoomResponseMessage)
+  );
+  registerHandler(ServerMessageType.LeaveRoomResponse, (msg) =>
+    handleLeaveRoomResponse(msg as LeaveRoomResponseMessage)
+  );
+  registerHandler(ServerMessageType.GameError, (msg) =>
+    handleGameError(msg as GameErrorMessage)
+  );
+  registerHandler(ServerMessageType.GameState, (msg) =>
+    handleGameState(msg as GameStateMessage)
+  );
+  registerHandler(ServerMessageType.GameResult, (msg) =>
+    handleGameResult(msg as Message)
+  );
+}
 
 function appendMessageLogs(msg: string) {
   const messageLogs = document.getElementById(
@@ -235,7 +101,9 @@ function updateRoomControl(room: Room) {
   if (roomUUID !== room.roomUUID) {
     return;
   }
-  const currentRoomCountLabel = document.getElementById("currentRoomCount") as HTMLLabelElement;
+  const currentRoomCountLabel = document.getElementById(
+    "currentRoomCount"
+  ) as HTMLLabelElement;
   currentRoomCountLabel.textContent = room.count.toString();
   startButton.disabled = room.count != 2;
 }
@@ -292,24 +160,19 @@ function handleUpsertRoom(room: Room) {
 }
 
 function handleRoomClick(room: Room) {
-  if (!socket || socket.readyState !== WebSocket.OPEN) {
-    console.error("WebSocket is not connected.");
-    return;
-  }
-
   if (roomUUID) {
     console.error("Player is in a room. Cannot join another");
     return;
   }
 
   const message: JoinRoomRequestMessage = {
-    action: MessageType.JoinRoom,
+    action: ClientMessageType.JoinRoom,
     message: {
       roomUUID: room.roomUUID,
       name: room.name,
     },
   };
-  socket.send(JSON.stringify(message));
+  sendClientMessage(message);
 }
 
 function handleDeleteRoom(room: Room) {
@@ -320,10 +183,14 @@ function handleRegisterResponse(resp: RegisterResponseMessage) {
   player.id = resp.message.id;
   player.name = resp.message.name;
 
-  const greetingNameLabel = document.getElementById("greetingName") as HTMLLabelElement;
+  const greetingNameLabel = document.getElementById(
+    "greetingName"
+  ) as HTMLLabelElement;
   greetingNameLabel.textContent = player.name;
 
-  const registrationElement = document.getElementById("registration") as HTMLDivElement;
+  const registrationElement = document.getElementById(
+    "registration"
+  ) as HTMLDivElement;
   registrationElement.hidden = true;
   const mainElement = document.getElementById("main") as HTMLDivElement;
   mainElement.hidden = false;
@@ -340,8 +207,8 @@ function handleRegisterResponse(resp: RegisterResponseMessage) {
 function handleJoinRoomResponse(resp: JoinRoomResponseMessage) {
   const roomNameLabel = document.getElementById("roomName") as HTMLLabelElement;
   roomNameLabel.textContent = resp.message.name;
-  
-  hubElement.hidden = true
+
+  hubElement.hidden = true;
   roomUUID = resp.message.roomUUID;
   renderEmptyBoard();
   roomElement.hidden = false;
@@ -351,7 +218,7 @@ function handleLeaveRoomResponse(resp: LeaveRoomResponseMessage) {
   if (roomUUID == resp.message.roomUUID) {
     roomUUID = null;
     roomElement.hidden = true;
-    hubElement.hidden = false
+    hubElement.hidden = false;
   } else {
     console.error("unrelated message", resp);
   }
@@ -381,11 +248,6 @@ function handleGameResult(resp: Message) {
 }
 
 function createRoom() {
-  if (!socket || socket.readyState !== WebSocket.OPEN) {
-    console.error("WebSocket is not connected.");
-    return;
-  }
-
   const newRoomNameInput = document.getElementById(
     "newRoomName"
   ) as HTMLInputElement;
@@ -396,13 +258,13 @@ function createRoom() {
 
   createRoomButton.disabled = true;
   const message: JoinRoomRequestMessage = {
-    action: MessageType.JoinRoom,
+    action: ClientMessageType.JoinRoom,
     message: {
       name: roomName,
       roomUUID: null,
     },
   };
-  socket.send(JSON.stringify(message));
+  sendClientMessage(message);
 }
 
 function handleStartGameRequest() {
@@ -411,12 +273,12 @@ function handleStartGameRequest() {
     return;
   }
   const message: StartGameMessage = {
-    action: MessageType.StartGame,
+    action: ClientMessageType.StartGame,
     message: {
       roomUUID: roomUUID,
     },
   };
-  socket.send(JSON.stringify(message));
+  sendClientMessage(message);
 }
 
 function renderGameBoard(resp: GameStateMessage) {
@@ -482,7 +344,7 @@ function getBoardCell(i: number, j: number): HTMLButtonElement {
 function renderBoard(resp: GameStateMessage) {
   for (let i = 0; i < 8; i++) {
     for (let j = 0; j < 8; j++) {
-      const token = resp.message.board[i][j];
+      const token = resp.message.board?.[i]?.[j];
       const cell = getBoardCell(i, j);
       cell.disabled = true;
       if (token == 1) {
@@ -516,16 +378,12 @@ function renderBoard(resp: GameStateMessage) {
 }
 
 function handleCellClick(row: number, col: number) {
-  if (!socket) {
-    console.error("No socket connection established");
-    return;
-  }
   if (!roomUUID) {
     console.error("Player isn't in any room");
     return;
   }
-  const msg: MakeMoveMessage = {
-    action: MessageType.MakeMove,
+  const message: MakeMoveMessage = {
+    action: ClientMessageType.MakeMove,
     message: {
       roomUUID: roomUUID,
       point: {
@@ -534,29 +392,25 @@ function handleCellClick(row: number, col: number) {
       },
     },
   };
-  socket.send(JSON.stringify(msg));
+  sendClientMessage(message);
 }
 
 function handleLeaveRoomClick() {
-  if (!socket || socket.readyState !== WebSocket.OPEN) {
-    console.error("WebSocket is not connected.");
-    return;
-  }
-
   if (!roomUUID) {
-    console.error("Player isn't in any room")
+    console.error("Player isn't in any room");
     return;
   }
 
   const message: LeaveRoomRequestMessage = {
-    action: MessageType.LeaveRoom,
+    action: ClientMessageType.LeaveRoom,
     message: {
       roomUUID: roomUUID,
     },
   };
-  socket.send(JSON.stringify(message));
+  sendClientMessage(message);
 }
 
+initServerMessageHandlers();
 registerButton.onclick = register;
 createRoomButton.onclick = createRoom;
 startButton.onclick = handleStartGameRequest;
