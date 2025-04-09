@@ -24,7 +24,7 @@ export function initWebSocket(serverUrl: string, playerName: string) {
   socket.onerror = (error) => console.error("WebSocket error:", error);
 }
 
-const serverMessageHandler: Partial<
+export const serverMessageHandler: Partial<
   Record<ServerMessageType, (msg: ServerMessage) => void>
 > = {};
 
